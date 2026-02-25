@@ -5,8 +5,8 @@ MindForge — keyboard-first, offline-capable mind map PWA.
 ## Stack
 
 - Core engine: TypeScript (strict), zero browser dependencies
-- Web app: React 19, Vite, SVG rendering, d3-zoom
-- Layout: dagre
+- Web app: React 19, Vite, SVG rendering, custom pan/zoom (pure math)
+- Layout: @dagrejs/dagre
 - Testing: Vitest (unit via TestEditor), Playwright (visual regression only)
 - File I/O: browser-fs-access
 - Package manager: Bun (Playwright uses Node.js)
@@ -36,6 +36,9 @@ bun run build        # Production build
 - **Positions are computed, never stored.** Layout engine derives x/y from tree structure. The file format stores only structure and metadata.
 - **Images use sidecar storage.** `file.mindmap` + `file.assets/` directory. Never base64 in JSON.
 - **TestEditor for logic tests.** Playwright is only for visual regression and browser-API integration. If it can be tested without a browser, it must be.
+- **Text editing uses positioned textarea.** Not SVG foreignObject (cross-browser issues). Textarea is absolutely positioned over the canvas with zoom-aware transforms.
+- **Root node cannot be deleted.** Delete operations are no-ops on the root.
+- **Multi-line node text.** Shift+Enter inserts newline in edit mode. Enter exits edit mode and creates sibling.
 
 ## Specs and progress
 

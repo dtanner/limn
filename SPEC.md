@@ -67,7 +67,7 @@ The core thesis is that by building the engine as a framework-agnostic TypeScrip
 |-------|-----------|---------|
 | Language | TypeScript (strict mode) | Type safety, IDE support, Claude Code compatibility |
 | Test runner | Vitest | Fast, ESM-native, compatible with TestEditor pattern |
-| Layout | dagre | Sugiyama-style tree layout; computes node positions from tree structure |
+| Layout | @dagrejs/dagre | Sugiyama-style tree layout; computes node positions from tree structure |
 | Validation | zod | Runtime schema validation for file format |
 
 ### Web application
@@ -75,7 +75,7 @@ The core thesis is that by building the engine as a framework-agnostic TypeScrip
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
 | Rendering | SVG via React (custom components) | DOM-based rendering for testability and accessibility |
-| Viewport | d3-zoom (or lightweight equivalent) | Pan, zoom, zoom-to-fit with smooth transitions |
+| Viewport | Custom pan/zoom (pure math) | scrollX/scrollY/zoom as Editor state; CSS transforms; no library needed (Excalidraw pattern) |
 | Framework | React 19 + TypeScript | Component rendering; signals-style reactivity via useSyncExternalStore |
 | Build | Vite | Dev server, HMR, production bundling |
 | File I/O | browser-fs-access | File System Access API with Safari/Firefox fallback |
@@ -85,7 +85,7 @@ The core thesis is that by building the engine as a framework-agnostic TypeScrip
 
 ### Why not React Flow?
 
-React Flow provides excellent out-of-the-box pan/zoom/drag for node-based UIs. However, it owns the interaction model — its event handling, selection system, and keyboard shortcuts would conflict with routing all interactions through our Editor API. The TestEditor pattern requires that the Editor is the sole source of truth for all state mutations, which means we need full control over the event pipeline. Building a simpler SVG renderer with d3-zoom costs more upfront but pays off in testability and architectural clarity.
+React Flow provides excellent out-of-the-box pan/zoom/drag for node-based UIs. However, it owns the interaction model — its event handling, selection system, and keyboard shortcuts would conflict with routing all interactions through our Editor API. The TestEditor pattern requires that the Editor is the sole source of truth for all state mutations, which means we need full control over the event pipeline. Building a simpler SVG renderer with custom pan/zoom (pure math, following the Excalidraw pattern) costs more upfront but pays off in testability and architectural clarity.
 
 ### Why web-first (not Electron/Tauri)?
 
@@ -99,7 +99,7 @@ Excalidraw proved this model: they deprecated their Electron app because the web
 
 1. **The Editor is the source of truth, not the DOM.** All state mutations flow through the Editor API. The DOM is a rendering target. This enables the TestEditor pattern.
 2. **Diff-based undo, not command-based.** The store captures diffs for every mutation automatically. Undo inverts the diff. No need to maintain Command classes for every operation.
-3. **Flat runtime model, nested file format.** In memory, nodes live in a flat Map keyed by ID with parentId references (fast lookups, easy updates). On disk, they serialize as a nested tree (clean diffs, human-readable).
+3. **Flat runtime model, nested file format.** In memory, nodes live in a flat Map keyed by ID with both `parentId` and `children[]` references (O(1) parent lookup, ordered child traversal). On disk, they serialize as a nested tree (clean diffs, human-readable).
 4. **Positions are computed, never stored.** The layout algorithm produces positions from the tree structure at render time. The file stores only structure, text, and metadata — never coordinates.
 5. **Images stored as sidecar files.** Binary assets live in a `{name}.assets/` directory alongside the JSON file, referenced by relative path. This keeps the JSON diffable and the assets manageable in git.
 
@@ -112,10 +112,10 @@ packages/
       model/           # MindMapNode, MindMap, CrossLink types
       store/           # Reactive store with diff tracking
       editor/          # Editor class — all operations
-      layout/          # dagre integration, position computation
+      layout/          # @dagrejs/dagre integration, position computation
       serialization/   # JSON ↔ model, markdown export
       test-editor/     # TestEditor subclass for testing
-      commands/        # Named operations (for history marks)
+      operations/      # Grouped mutation functions (not Command pattern)
 
   web/                 # React web application
     src/
@@ -134,7 +134,8 @@ The `core` package has zero browser or React dependencies. It can be used in Nod
 ```typescript
 interface MindMapNode {
   id: string;              // Stable unique ID (nanoid)
-  text: string;            // Node content
+  parentId: string | null; // null for root node only
+  text: string;            // Node content (supports multi-line via Shift+Enter)
   children: string[];      // Ordered child IDs (sibling order matters)
   collapsed: boolean;      // Whether children are hidden
   style?: NodeStyle;       // Optional color, shape overrides
@@ -177,7 +178,7 @@ interface MindMap {
 
 ### File format (.mindmap)
 
-On disk, the flat map serializes as a nested tree for readability and clean diffs. Keys are sorted. No positions stored.
+On disk, the flat map serializes as a nested tree for readability and clean diffs. Keys are sorted. No positions stored. The `parentId` field is omitted (parent is implicit from nesting). The `collapsed` field is omitted when `false` (the default) to reduce noise.
 
 ```json
 {
@@ -359,7 +360,7 @@ The app has two distinct modes, following the MindNode/Excel paradigm:
 
 **Navigation mode** (default): Keyboard input operates on tree structure. Arrow keys move selection. Tab/Enter create nodes. Shortcuts modify the selected node.
 
-**Edit mode** (entered via F2 or double-click): Keyboard input goes to the text cursor. Arrow keys move within text. Escape exits to navigation mode. Creating a new node (Tab/Enter) automatically enters edit mode for that node.
+**Edit mode** (entered via F2 or double-click): Keyboard input goes to an absolutely-positioned textarea overlaid on the node (not SVG foreignObject, which has cross-browser issues). Arrow keys move within text. Escape exits to navigation mode. Creating a new node (Tab/Enter) automatically enters edit mode for that node. Nodes support multi-line text: Shift+Enter inserts a newline, Enter exits edit mode and creates a sibling, Tab exits edit mode and creates a child.
 
 ### Keyboard shortcuts (navigation mode)
 
@@ -370,15 +371,15 @@ The app has two distinct modes, following the MindNode/Excel paradigm:
 | Create sibling below | Enter | New sibling after selected node; enters edit mode |
 | Create sibling above | Shift+Enter | New sibling before selected node; enters edit mode |
 | **Navigation** | | |
-| Move to parent | ← (or ↑ at first sibling) | Select parent node |
-| Move to first child | → | Select first child (if expanded) |
-| Move to next sibling | ↓ | Select next sibling |
-| Move to previous sibling | ↑ | Select previous sibling |
+| Left | ← | Collapse expanded node; if already collapsed or leaf, move to parent |
+| Right | → | Expand collapsed node; if already expanded, move to first child |
+| Down | ↓ | Move to next visually-below node (can cross parent boundaries) |
+| Up | ↑ | Move to previous visually-above node (can cross parent boundaries) |
 | **Editing** | | |
 | Enter edit mode | F2 or ⌘+Enter | Cursor in selected node's text |
 | Exit edit mode | Escape | Return to navigation mode |
-| Delete node | Backspace or Delete | Remove node (children reparented to grandparent) |
-| Delete node and children | ⌘+Backspace | Remove entire subtree |
+| Delete node | Backspace or Delete | Remove node (children reparented to grandparent); no-op on root |
+| Delete node and children | ⌘+Backspace | Remove entire subtree; no-op on root |
 | **Structure** | | |
 | Collapse/expand | Space | Toggle selected node's collapsed state |
 | Move node up | ⌘+↑ | Reorder among siblings |
@@ -438,7 +439,7 @@ Following tldraw's architecture, undo/redo is automatic and diff-based rather th
 - Drag an image file from Finder onto a node → image attaches to that node
 - Drag an image onto the canvas (not a node) → creates a new node with the image
 - Paste an image from clipboard → attaches to selected node
-- Resize handles on the image corners; aspect ratio preserved by default (hold Shift to free resize)
+- Resize handles on the image corners; free resize by default (hold Shift to constrain aspect ratio)
 - Delete key on a selected image removes the image from the node (not the node itself)
 
 ### Storage
@@ -467,7 +468,7 @@ In the browser (before explicit save), images are held in memory as Blob URLs an
 
 ### Auto-save (IndexedDB)
 
-Every mutation is debounced (500ms) and auto-saved to IndexedDB via `idb-keyval`. This survives tab closes and browser restarts. A `persistenceKey` identifies each document. Cross-tab sync uses BroadcastChannel to keep multiple tabs consistent.
+Every mutation is debounced (500ms) and auto-saved to IndexedDB via `idb-keyval`. This survives tab closes and browser restarts. A `persistenceKey` identifies each document. Cross-tab sync uses BroadcastChannel with last-write-wins (timestamp comparison) to keep multiple tabs consistent. No merge logic for v1.
 
 ### Explicit save (File System Access API)
 
@@ -521,8 +522,8 @@ Chunks 2 and 3 can be developed in parallel (they share types but are otherwise 
 
 | Chunk | Scope | Deliverables | Tests |
 |-------|-------|-------------|-------|
-| **5. Layout engine** | dagre integration; compute positions from tree; handle collapsed subtrees; standard mind map layout (root center, children balanced left/right) | `core/src/layout/` | Position snapshot tests; collapsed subtree exclusion tests |
-| **6. SVG renderer** | React components for nodes, edges, labels; pan/zoom viewport with d3-zoom; render from Editor state | `web/src/components/` | Playwright visual regression screenshots |
+| **5. Layout engine** | @dagrejs/dagre integration; compute positions from tree; handle collapsed subtrees; standard mind map layout (root center, children balanced left/right) | `core/src/layout/` | Position snapshot tests; collapsed subtree exclusion tests |
+| **6. SVG renderer** | React components for nodes, edges, labels; custom pan/zoom viewport; render from Editor state | `web/src/components/` | Playwright visual regression screenshots |
 | **7. Node styling** | Colors, shape variants, collapse indicators, selected/focused states; CSS | `web/src/components/` | Playwright screenshot comparisons |
 
 ### Phase 3 — Interaction (Chunks 8–12)
