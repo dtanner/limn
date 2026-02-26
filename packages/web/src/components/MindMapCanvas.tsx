@@ -394,6 +394,7 @@ export function MindMapCanvas() {
           width: "100%",
           height: "100%",
           cursor: isPanning.current || isDragging ? "grabbing" : "default",
+          userSelect: "none",
         }}
         onWheel={handleWheel}
         onPointerDown={handlePointerDown}

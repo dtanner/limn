@@ -141,34 +141,63 @@ describe("drag to reparent", () => {
     return editor;
   }
 
-  it("should detect reparent target when dragged near another node", () => {
+  it("should detect reparent target when dragged onto another node", () => {
     const editor = createTwoChildTree();
     const child1 = editor.getNode("n1");
-
-    // Drag child1 close to child2
     const child2 = editor.getNode("n2");
+
+    // Drag child1 onto child2 (center on center)
     editor.pointerDown("n1", child1.x + 10, child1.y + 10);
-    // Move near child2's right edge (where a child would attach)
-    editor.pointerMove(child2.x + child2.width + 50, child2.y + child2.height / 2);
+    editor.pointerMove(child2.x + 10, child2.y + 10);
 
     expect(editor.getReparentTarget()).toBe("n2");
     editor.pointerUp();
   });
 
-  it("should reparent node when dropped on reparent target", () => {
+  it("should reparent node when dropped on another node and position as child", () => {
     const editor = createTwoChildTree();
     const child1 = editor.getNode("n1");
     const child2 = editor.getNode("n2");
 
-    // Drag child1 close to child2
+    // Drag child1 onto child2
     editor.pointerDown("n1", child1.x + 10, child1.y + 10);
-    editor.pointerMove(child2.x + child2.width + 50, child2.y + child2.height / 2);
+    editor.pointerMove(child2.x + 10, child2.y + 10);
     editor.pointerUp();
 
     // child1 should now be a child of child2
     expect(editor.getNode("n1").parentId).toBe("n2");
     editor.expectChildren("n0", ["n2"]);
     editor.expectChildren("n2", ["n1"]);
+
+    // child1 should be positioned as a proper child (to the right of child2)
+    const reparented = editor.getNode("n1");
+    expect(reparented.x).toBeGreaterThan(child2.x);
+  });
+
+  it("should move children along with reparented node", () => {
+    const editor = createTwoChildTree();
+    // Add a grandchild under child1
+    editor.addChild("n1", "grandchild");
+    editor.exitEditMode();
+
+    const child1 = editor.getNode("n1");
+    const grandchild = editor.getNode("n3");
+    const child2 = editor.getNode("n2");
+
+    // Record horizontal offset between child1 and grandchild
+    const relX = grandchild.x - child1.x;
+
+    // Drag child1 (with its grandchild) onto child2
+    editor.pointerDown("n1", child1.x + 10, child1.y + 10);
+    editor.pointerMove(child2.x + 10, child2.y + 10);
+    editor.pointerUp();
+
+    // Grandchild should have moved with child1, preserving relative offset
+    const movedChild1 = editor.getNode("n1");
+    const movedGrandchild = editor.getNode("n3");
+    expect(movedGrandchild.x - movedChild1.x).toBeCloseTo(relX, 0);
+    expect(movedChild1.parentId).toBe("n2");
+    expect(movedGrandchild.parentId).toBe("n1");
   });
 
   it("should not reparent when dropped in open space", () => {
@@ -197,9 +226,9 @@ describe("drag to reparent", () => {
     const parent = editor.getNode("n1");
     const child = editor.getNode("n2");
 
-    // Drag parent near its own child
+    // Drag parent onto its own child
     editor.pointerDown("n1", parent.x + 10, parent.y + 10);
-    editor.pointerMove(child.x + child.width + 50, child.y + child.height / 2);
+    editor.pointerMove(child.x + 10, child.y + 10);
 
     // Should NOT detect child as reparent target
     expect(editor.getReparentTarget()).toBeNull();
@@ -215,7 +244,7 @@ describe("drag to reparent", () => {
     const child2 = editor.getNode("n2");
 
     editor.pointerDown("n1", child1.x + 10, child1.y + 10);
-    editor.pointerMove(child2.x + child2.width + 50, child2.y + child2.height / 2);
+    editor.pointerMove(child2.x + 10, child2.y + 10);
     expect(editor.getReparentTarget()).toBe("n2");
 
     editor.pointerUp();
@@ -229,7 +258,7 @@ describe("drag to reparent", () => {
     const origParent = child1.parentId;
 
     editor.pointerDown("n1", child1.x + 10, child1.y + 10);
-    editor.pointerMove(child2.x + child2.width + 50, child2.y + child2.height / 2);
+    editor.pointerMove(child2.x + 10, child2.y + 10);
     editor.pointerUp();
 
     expect(editor.getNode("n1").parentId).toBe("n2");

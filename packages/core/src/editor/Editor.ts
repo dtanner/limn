@@ -610,8 +610,18 @@ export class Editor {
     const nodeId = this.dragNodeId;
 
     if (this.reparentTargetId !== null) {
-      // Reparent the node
+      // Reparent the node and reposition entire subtree as child of target
+      const oldX = this.store.getNode(nodeId).x;
+      const oldY = this.store.getNode(nodeId).y;
       this.store.moveNode(nodeId, this.reparentTargetId);
+      positionNewChild(this.store, nodeId);
+      const newNode = this.store.getNode(nodeId);
+      const dx = newNode.x - oldX;
+      const dy = newNode.y - oldY;
+      for (const childId of newNode.children) {
+        this.moveSubtree(childId, dx, dy);
+      }
+      relayoutFromNode(this.store, nodeId);
     }
 
     if (!this.dragMoved && this.reparentTargetId === null) {
@@ -634,15 +644,11 @@ export class Editor {
     }
   }
 
-  /** Find the nearest non-descendant node within reparent proximity. */
+  /** Find a reparent target: the node whose bounding box contains the dragged node's center. */
   private findReparentTarget(draggedId: string): string | null {
     const dragged = this.store.getNode(draggedId);
     const draggedCenterX = dragged.x + dragged.width / 2;
     const draggedCenterY = dragged.y + dragged.height / 2;
-
-    const PROXIMITY_THRESHOLD = 100;
-    let bestId: string | null = null;
-    let bestDist = PROXIMITY_THRESHOLD;
 
     for (const node of this.store.getVisibleNodes()) {
       if (node.id === draggedId) continue;
@@ -651,20 +657,18 @@ export class Editor {
       // Cannot reparent to current parent (already there)
       if (node.id === dragged.parentId) continue;
 
-      // Distance from dragged node center to potential parent's edge center
-      const edgeX = draggedCenterX < node.x + node.width / 2
-        ? node.x                    // approach from left
-        : node.x + node.width;     // approach from right
-      const edgeY = node.y + node.height / 2;
-
-      const dist = Math.hypot(draggedCenterX - edgeX, draggedCenterY - edgeY);
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestId = node.id;
+      // Check if dragged node's center is within this node's bounding box
+      if (
+        draggedCenterX >= node.x &&
+        draggedCenterX <= node.x + node.width &&
+        draggedCenterY >= node.y &&
+        draggedCenterY <= node.y + node.height
+      ) {
+        return node.id;
       }
     }
 
-    return bestId;
+    return null;
   }
 
   // --- Width resize ---
