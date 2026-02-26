@@ -3,7 +3,7 @@
 ## Current status
 
 **Phase**: Phase 2 -- Visual Shell
-**Next chunk**: Chunk 6 (SVG renderer)
+**Next chunk**: Chunk 7 (Node styling)
 **Last updated**: 2026-02-26
 
 ---
@@ -133,8 +133,37 @@
 - Branch direction for first child inferred from parent's branch direction (supports left-side trees)
 - ID collision fix critical: without it, addChild after deserialization could overwrite existing nodes
 
-### Up next: Chunk 6
-- SVG renderer in packages/web/
+### Chunk 6: SVG renderer (2026-02-26)
+
+**What was done:**
+- Added change subscription system to Editor (subscribe/getVersion for useSyncExternalStore)
+- Added camera state to Editor (getCamera/setCamera) with load from file format
+- Created React hooks: useEditor (subscribes to Editor state), EditorContext
+- Created SVG NodeView component (rounded rect + text, selected state highlight, collapse indicator)
+- Created SVG EdgeView component (cubic bezier curves connecting parent edge center to child edge center)
+- Created MindMapCanvas component with pan/zoom viewport (scroll to pan, Cmd+scroll to zoom)
+- Wired everything up in App.tsx with a demo mind map
+- Click-to-select working, pan/zoom working
+
+**Files changed:**
+- `packages/core/src/editor/Editor.ts` -- added camera, subscribe/notify, version counter
+- `packages/web/src/hooks/useEditor.ts` -- EditorContext and useEditor hook
+- `packages/web/src/components/NodeView.tsx` -- SVG node rendering
+- `packages/web/src/components/EdgeView.tsx` -- SVG edge rendering
+- `packages/web/src/components/MindMapCanvas.tsx` -- SVG viewport with pan/zoom
+- `packages/web/src/App.tsx` -- wired up with demo data
+
+**Tests added:**
+- Visual verification via dev server (Playwright visual regression deferred to styling chunk)
+
+**Notes/decisions:**
+- Using useSyncExternalStore pattern: Editor.subscribe() + Editor.getVersion() as snapshot
+- Camera state is session-only (not tracked by undo), loaded from file format on loadJSON
+- Pan: scroll wheel or pointer drag on canvas background
+- Zoom: Cmd/Ctrl + scroll wheel, zooms toward cursor position
+
+### Up next: Chunk 7
+- Node styling, colors, collapse indicators, selected/focused states
 
 ---
 

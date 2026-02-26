@@ -1,7 +1,7 @@
 // ABOUTME: Core Editor class wrapping MindMapStore with selection, modes, and undo.
 // ABOUTME: All state mutations flow through Editor; it is the sole source of truth.
 
-import type { MindMapNode, TextMeasurer, MindMapMeta } from "../model/types";
+import type { MindMapNode, TextMeasurer, MindMapMeta, Camera } from "../model/types";
 import { MindMapStore } from "../store/MindMapStore";
 import { deserialize, serialize } from "../serialization/serialization";
 import type { MindMapFileFormat } from "../serialization/schema";
@@ -46,6 +46,7 @@ export class Editor {
   // Session state (not tracked by undo)
   private selectedId: string | null = null;
   private editing = false;
+  private camera: Camera = { x: 0, y: 0, zoom: 1 };
 
   // Document metadata
   protected meta: MindMapMeta = { id: "default", version: 1, theme: "default" };
@@ -53,6 +54,10 @@ export class Editor {
   // Undo/redo
   private undoStack: HistoryEntry[] = [];
   private redoStack: HistoryEntry[] = [];
+
+  // Change notification for reactive UI (useSyncExternalStore)
+  private version = 0;
+  private listeners: Set<() => void> = new Set();
 
   constructor(textMeasurer: TextMeasurer = stubTextMeasurer) {
     this.store = new MindMapStore();
@@ -97,16 +102,48 @@ export class Editor {
     return this.store.nodeCount;
   }
 
+  getCamera(): Camera {
+    return this.camera;
+  }
+
+  setCamera(x: number, y: number, zoom: number): void {
+    this.camera = { x, y, zoom };
+    this.notify();
+  }
+
+  // --- Subscription (for useSyncExternalStore) ---
+
+  /** Subscribe to state changes. Returns an unsubscribe function. */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => { this.listeners.delete(listener); };
+  }
+
+  /** Returns a version number that increments on every state change. */
+  getVersion(): number {
+    return this.version;
+  }
+
+  /** Notify all subscribers that state has changed. */
+  protected notify(): void {
+    this.version++;
+    for (const listener of this.listeners) {
+      listener();
+    }
+  }
+
   // --- Selection ---
 
   select(nodeId: string): void {
     this.store.getNode(nodeId); // Validate exists
     this.selectedId = nodeId;
+    this.notify();
   }
 
   deselect(): void {
     this.selectedId = null;
     this.editing = false;
+    this.notify();
   }
 
   // --- Edit mode ---
@@ -114,6 +151,7 @@ export class Editor {
   enterEditMode(): void {
     if (this.selectedId === null) return;
     this.editing = true;
+    this.notify();
   }
 
   exitEditMode(): void {
@@ -129,6 +167,7 @@ export class Editor {
         this.store.deleteNode(nodeToDelete);
       }
     }
+    this.notify();
   }
 
   // --- Mutations (all tracked for undo) ---
@@ -138,6 +177,7 @@ export class Editor {
     const id = this.store.addRoot(text, x, y);
     this.selectedId = id;
     this.editing = true;
+    this.notify();
     return id;
   }
 
@@ -148,6 +188,7 @@ export class Editor {
     this.resolveOverlapForNode(id);
     this.selectedId = id;
     this.editing = true;
+    this.notify();
     return id;
   }
 
@@ -163,6 +204,7 @@ export class Editor {
     this.resolveOverlapForNode(id);
     this.selectedId = id;
     this.editing = true;
+    this.notify();
     return id;
   }
 
@@ -176,11 +218,13 @@ export class Editor {
       relayoutAfterDelete(this.store, parentId);
       this.resolveOverlapForNode(parentId);
     }
+    this.notify();
   }
 
   setText(nodeId: string, text: string): void {
     this.pushUndo("set-text");
     this.store.setText(nodeId, text);
+    this.notify();
   }
 
   toggleCollapse(nodeId: string): void {
@@ -188,16 +232,19 @@ export class Editor {
     this.store.toggleCollapse(nodeId);
     relayoutFromNode(this.store, nodeId);
     this.resolveOverlapForNode(nodeId);
+    this.notify();
   }
 
   reorderNode(nodeId: string, direction: "up" | "down"): void {
     this.pushUndo("reorder-node");
     this.store.reorderNode(nodeId, direction);
+    this.notify();
   }
 
   setNodePosition(nodeId: string, x: number, y: number): void {
     this.pushUndo("set-position");
     this.store.setNodePosition(nodeId, x, y);
+    this.notify();
   }
 
   // --- Undo/redo ---
@@ -207,6 +254,7 @@ export class Editor {
     if (!entry) return;
     this.redoStack.push(this.captureState("redo"));
     this.restoreState(entry);
+    this.notify();
   }
 
   redo(): void {
@@ -214,6 +262,7 @@ export class Editor {
     if (!entry) return;
     this.undoStack.push(this.captureState("undo"));
     this.restoreState(entry);
+    this.notify();
   }
 
   // --- Serialization ---
@@ -221,10 +270,12 @@ export class Editor {
   loadJSON(data: MindMapFileFormat): void {
     this.store = deserialize(data);
     this.meta = { ...data.meta, version: data.version };
+    this.camera = data.camera ?? { x: 0, y: 0, zoom: 1 };
     this.selectedId = null;
     this.editing = false;
     this.undoStack = [];
     this.redoStack = [];
+    this.notify();
   }
 
   toJSON(): MindMapFileFormat {
