@@ -5,6 +5,7 @@ import type { MindMapNode, MindMapMeta } from "../model/types";
 import { MindMapStore } from "../store/MindMapStore";
 import type { MindMapFileFormat, MindMapFileNode } from "./schema";
 import { mindMapFileSchema } from "./schema";
+import { CURRENT_FORMAT_VERSION } from "./migration";
 
 /**
  * Deserialize nested file format into a flat MindMapStore.
@@ -70,7 +71,7 @@ export function serialize(
   }
 
   return {
-    version: meta.version,
+    version: CURRENT_FORMAT_VERSION,
     meta: { id: meta.id, theme: meta.theme },
     camera,
     roots: store.getRoots().map(serializeNode),

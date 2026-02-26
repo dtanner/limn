@@ -9,6 +9,7 @@ import { AssetUrlContext, type AssetUrlMap } from "./hooks/useAssetUrls";
 import { MindMapCanvas } from "./components/MindMapCanvas";
 import { useKeyboardHandler } from "./input/useKeyboardHandler";
 import { setupAutoSave, loadFromIDB } from "./persistence/local";
+import { saveToFile, openFile } from "./persistence/file";
 
 const DEMO_MAP: MindMapFileFormat = {
   version: 1,
@@ -83,6 +84,23 @@ export function App() {
       editor.loadJSON(data);
     });
   }, [editor, loaded]);
+
+  // Wire Cmd+S and Cmd+O to file save/open
+  useEffect(() => {
+    editor.onSave(() => {
+      saveToFile(editor).catch((err) => {
+        // User cancelled the dialog or save failed
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        console.error("Save failed:", err);
+      });
+    });
+    editor.onOpen(() => {
+      openFile(editor).catch((err) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        console.error("Open failed:", err);
+      });
+    });
+  }, [editor]);
 
   useKeyboardHandler(editor);
 

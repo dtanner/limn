@@ -28,6 +28,8 @@ export type {
   MindMapFileNode,
 } from "./serialization/schema";
 
+export { CURRENT_FORMAT_VERSION, migrateToLatest } from "./serialization/migration";
+
 export {
   subtreeHeight,
   branchDirection,

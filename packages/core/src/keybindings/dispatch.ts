@@ -182,6 +182,22 @@ const bindings: KeyBinding[] = [
       editor.redo();
     },
   },
+  {
+    key: "s",
+    modifiers: { meta: true },
+    mode: "both",
+    action: (editor) => {
+      editor.requestSave();
+    },
+  },
+  {
+    key: "o",
+    modifiers: { meta: true },
+    mode: "both",
+    action: (editor) => {
+      editor.requestOpen();
+    },
+  },
 ];
 
 /**

@@ -63,6 +63,10 @@ export class Editor {
   // Asset registry (document state)
   private assets: Asset[] = [];
 
+  // External action callbacks (set by web layer)
+  private saveCallback: (() => void) | null = null;
+  private openCallback: (() => void) | null = null;
+
   // Undo/redo
   private undoStack: HistoryEntry[] = [];
   private redoStack: HistoryEntry[] = [];
@@ -121,6 +125,28 @@ export class Editor {
   setCamera(x: number, y: number, zoom: number): void {
     this.camera = { x, y, zoom };
     this.notify();
+  }
+
+  // --- External action callbacks ---
+
+  /** Register a callback for save requests (Cmd+S). */
+  onSave(cb: () => void): void {
+    this.saveCallback = cb;
+  }
+
+  /** Register a callback for open requests (Cmd+O). */
+  onOpen(cb: () => void): void {
+    this.openCallback = cb;
+  }
+
+  /** Request a save operation (called by dispatch on Cmd+S). */
+  requestSave(): void {
+    this.saveCallback?.();
+  }
+
+  /** Request a file open operation (called by dispatch on Cmd+O). */
+  requestOpen(): void {
+    this.openCallback?.();
   }
 
   // --- Subscription (for useSyncExternalStore) ---
