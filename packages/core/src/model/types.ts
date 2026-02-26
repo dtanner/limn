@@ -1,8 +1,9 @@
 // ABOUTME: Core data model types for MindForge.
 // ABOUTME: Framework-agnostic interfaces shared by all packages.
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- placeholder for future font, size, color properties
-export interface NodeStyle {}
+export interface NodeStyle {
+  fontSize?: number;
+}
 
 export interface ImageRef {
   assetId: string;

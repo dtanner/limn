@@ -213,6 +213,33 @@ describe("drag to reparent", () => {
     expect(editor.getNode("n1").parentId).toBe("n0");
   });
 
+  it("should reflow children when node is dragged to other side of root", () => {
+    const editor = new TestEditor();
+    // Root at (0, 0), child at (250, 0), grandchild at (500, 0)
+    editor.addRoot("root", 0, 0);
+    editor.select("n0");
+    editor.exitEditMode();
+    editor.addChild("n0", "child");
+    editor.exitEditMode();
+    editor.addChild("n1", "grandchild");
+    editor.exitEditMode();
+
+    // child (n1) is to the right of root, grandchild (n2) is further right
+    expect(editor.getNode("n1").x).toBeGreaterThan(editor.getNode("n0").x);
+    expect(editor.getNode("n2").x).toBeGreaterThan(editor.getNode("n1").x);
+
+    // Drag child to the left side of root
+    const child = editor.getNode("n1");
+    editor.pointerDown("n1", child.x + 10, child.y + 10);
+    editor.pointerMove(-300, child.y + 10);
+    editor.pointerUp();
+
+    // child should now be to the left of root
+    expect(editor.getNode("n1").x).toBeLessThan(editor.getNode("n0").x);
+    // grandchild should also be to the left of child (further from root)
+    expect(editor.getNode("n2").x).toBeLessThan(editor.getNode("n1").x);
+  });
+
   it("should not allow reparent to own descendant", () => {
     const editor = new TestEditor();
     editor.addRoot("root", 0, 0);

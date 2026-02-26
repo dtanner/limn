@@ -2,7 +2,7 @@
 // ABOUTME: Zoom-aware positioning; delegates key events to core dispatch.
 
 import { useEffect, useRef, useCallback } from "react";
-import { dispatch } from "@mindforge/core";
+import { dispatch, ROOT_FONT_SIZE } from "@mindforge/core";
 import type { Editor, MindMapNode, Camera } from "@mindforge/core";
 
 const PADDING_X = 10;
@@ -92,10 +92,10 @@ export function TextEditor({ editor, node, camera }: TextEditorProps) {
         width: `${width}px`,
         minHeight: `${height}px`,
         padding: `${PADDING_Y * camera.zoom}px ${PADDING_X * camera.zoom}px`,
-        fontSize: `${FONT_SIZE * camera.zoom}px`,
+        fontSize: `${(node.parentId === null ? ROOT_FONT_SIZE : FONT_SIZE) * camera.zoom}px`,
         fontFamily: "system-ui, -apple-system, sans-serif",
         fontWeight: node.parentId === null ? 600 : 400,
-        lineHeight: `${20 * camera.zoom}px`,
+        lineHeight: `${Math.round((node.parentId === null ? ROOT_FONT_SIZE : FONT_SIZE) * (20 / 14)) * camera.zoom}px`,
         border: `${2 * camera.zoom}px solid #3b82f6`,
         borderRadius: `${6 * camera.zoom}px`,
         outline: "none",

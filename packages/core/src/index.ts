@@ -39,6 +39,7 @@ export {
   positionNewSibling,
   centerChildren,
   shiftSubtree,
+  reflowSubtree,
   relayoutFromNode,
   relayoutAfterDelete,
   treeBoundingBox,
@@ -47,7 +48,7 @@ export {
   V_GAP,
 } from "./layout/layout";
 
-export { Editor, stubTextMeasurer } from "./editor/Editor";
+export { Editor, stubTextMeasurer, ROOT_FONT_SIZE } from "./editor/Editor";
 export { dispatch } from "./keybindings/dispatch";
 export type { Modifiers } from "./keybindings/dispatch";
 export { TestEditor } from "./test-editor/TestEditor";

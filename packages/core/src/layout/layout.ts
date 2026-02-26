@@ -217,6 +217,28 @@ export function treeBoundingBox(
   return { minX, minY, maxX, maxY };
 }
 
+/**
+ * Reflow a node's descendants so children are on the correct side
+ * based on the node's current branch direction.
+ * Called after dragging a node to the other side of its root.
+ */
+export function reflowSubtree(store: MindMapStore, nodeId: string): void {
+  const node = store.getNode(nodeId);
+  const children = store.getChildren(nodeId);
+  if (children.length === 0) return;
+
+  const dir = branchDirection(store, nodeId);
+
+  for (const child of children) {
+    const expectedX = node.x + H_OFFSET * dir;
+    if (Math.abs(child.x - expectedX) > 0.001) {
+      store.setNodePosition(child.id, expectedX, child.y);
+    }
+    // Recursively reflow grandchildren
+    reflowSubtree(store, child.id);
+  }
+}
+
 const TREE_PADDING = 40;
 
 /**

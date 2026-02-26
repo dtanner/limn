@@ -27,9 +27,19 @@ function getMeasureElement(): HTMLDivElement {
   return measureEl;
 }
 
+function applyStyle(el: HTMLDivElement, style?: NodeStyle): void {
+  const fontSize = style?.fontSize ?? FONT_SIZE;
+  const lineHeight = Math.round(fontSize * (LINE_HEIGHT / FONT_SIZE));
+  const paddingY = Math.round(fontSize * (PADDING_Y / FONT_SIZE));
+  el.style.fontSize = `${fontSize}px`;
+  el.style.lineHeight = `${lineHeight}px`;
+  el.style.padding = `${paddingY}px ${PADDING_X}px`;
+}
+
 export const domTextMeasurer: TextMeasurer = {
-  measure(text: string, _style?: NodeStyle) {
+  measure(text: string, style?: NodeStyle) {
     const el = getMeasureElement();
+    applyStyle(el, style);
     el.style.whiteSpace = "pre";
     el.style.width = "";
     el.textContent = text || "\u00A0";
@@ -38,8 +48,9 @@ export const domTextMeasurer: TextMeasurer = {
     return { width, height };
   },
 
-  reflow(text: string, maxWidth: number, _style?: NodeStyle) {
+  reflow(text: string, maxWidth: number, style?: NodeStyle) {
     const el = getMeasureElement();
+    applyStyle(el, style);
     el.style.whiteSpace = "pre-wrap";
     el.style.wordBreak = "break-word";
     el.style.width = `${maxWidth}px`;

@@ -408,19 +408,19 @@ describe("Editor", () => {
     });
 
     test("updates node dimensions via text measurer", () => {
-      // Stub measurer: width = max(chars * 8 + 16, 100), height = lines * 20 + 12
+      // n0 is root → fontSize 16, charWidth=9, lineHeight=23, paddingY=7
       editor.setText("n0", "A much longer text string for testing");
       const node = editor.getNode("n0");
-      // "A much longer text string for testing" = 37 chars → 37 * 8 + 16 = 312
-      expect(node.width).toBe(312);
-      expect(node.height).toBe(32); // 1 line * 20 + 12
+      // 37 chars → 37 * 9 + 16 = 349
+      expect(node.width).toBe(349);
+      expect(node.height).toBe(37); // 1 line * 23 + 7*2
     });
 
     test("updates dimensions for multi-line text", () => {
       editor.setText("n0", "Line 1\nLine 2\nLine 3");
       const node = editor.getNode("n0");
-      // 3 lines → height = 3 * 20 + 12 = 72
-      expect(node.height).toBe(72);
+      // n0 is root → 3 lines * 23 + 7*2 = 83
+      expect(node.height).toBe(83);
     });
   });
 

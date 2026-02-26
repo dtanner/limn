@@ -1,7 +1,7 @@
 // ABOUTME: Core Editor class wrapping MindMapStore with selection, modes, and undo.
 // ABOUTME: All state mutations flow through Editor; it is the sole source of truth.
 
-import type { MindMapNode, TextMeasurer, MindMapMeta, Camera, Asset } from "../model/types";
+import type { MindMapNode, NodeStyle, TextMeasurer, MindMapMeta, Camera, Asset } from "../model/types";
 import { MindMapStore } from "../store/MindMapStore";
 import { deserialize, serialize, toMarkdown as storeToMarkdown } from "../serialization/serialization";
 import type { MindMapFileFormat } from "../serialization/schema";
@@ -9,10 +9,13 @@ import {
   branchDirection,
   positionNewChild,
   positionNewSibling,
+  reflowSubtree,
   relayoutAfterDelete,
   relayoutFromNode,
   resolveTreeOverlap,
 } from "../layout/layout";
+
+export const ROOT_FONT_SIZE = 16;
 
 /** Snapshot of document state for undo/redo. */
 interface HistoryEntry {
@@ -24,20 +27,27 @@ interface HistoryEntry {
 
 /** Stub text measurer that estimates from character count. */
 export const stubTextMeasurer: TextMeasurer = {
-  measure(text: string) {
+  measure(text: string, style?: NodeStyle) {
+    const scale = (style?.fontSize ?? 14) / 14;
+    const charWidth = Math.round(8 * scale);
+    const lineHeight = Math.round(20 * scale);
+    const paddingY = Math.round(6 * scale);
     const lines = text.split("\n");
     const maxLineLen = Math.max(...lines.map((l) => l.length), 0);
-    return { width: Math.max(maxLineLen * 8 + 16, 100), height: lines.length * 20 + 12 };
+    return { width: Math.max(maxLineLen * charWidth + 16, 100), height: lines.length * lineHeight + paddingY * 2 };
   },
-  reflow(text: string, maxWidth: number) {
-    const charWidth = 8;
+  reflow(text: string, maxWidth: number, style?: NodeStyle) {
+    const scale = (style?.fontSize ?? 14) / 14;
+    const charWidth = Math.round(8 * scale);
+    const lineHeight = Math.round(20 * scale);
+    const paddingY = Math.round(6 * scale);
     const charsPerLine = Math.floor((maxWidth - 16) / charWidth);
     const lines = text.split("\n");
     let totalLines = 0;
     for (const line of lines) {
       totalLines += Math.max(1, Math.ceil(line.length / charsPerLine));
     }
-    return { width: maxWidth, height: totalLines * 20 + 12 };
+    return { width: maxWidth, height: totalLines * lineHeight + paddingY * 2 };
   },
 };
 
@@ -329,6 +339,7 @@ export class Editor {
   addRoot(text = "", x = 0, y = 0): string {
     this.pushUndo("add-root");
     const id = this.store.addRoot(text, x, y);
+    this.remeasureNode(id);
     this.selectedId = id;
     this.editing = true;
     this.ensureNodeVisible(id);
@@ -339,6 +350,7 @@ export class Editor {
   addChild(parentId: string, text = ""): string {
     this.pushUndo("add-child");
     const id = this.store.addChild(parentId, text);
+    this.remeasureNode(id);
     positionNewChild(this.store, id);
     this.resolveOverlapForNode(id);
     this.selectedId = id;
@@ -356,6 +368,7 @@ export class Editor {
     const siblings = this.store.getNode(parentId).children;
     const index = siblings.indexOf(nodeId) + 1;
     const id = this.store.insertChild(parentId, index, text);
+    this.remeasureNode(id);
     positionNewSibling(this.store, id, nodeId);
     this.resolveOverlapForNode(id);
     this.selectedId = id;
@@ -656,7 +669,11 @@ export class Editor {
       for (const childId of newNode.children) {
         this.moveSubtree(childId, dx, dy);
       }
+      reflowSubtree(this.store, nodeId);
       relayoutFromNode(this.store, nodeId);
+    } else if (this.dragMoved) {
+      // Reflow children if node was dragged to the other side of its root
+      reflowSubtree(this.store, nodeId);
     }
 
     if (!this.dragMoved && this.reparentTargetId === null) {
@@ -969,11 +986,14 @@ export class Editor {
   /** Update a node's dimensions using the text measurer. */
   private remeasureNode(nodeId: string): void {
     const node = this.store.getNode(nodeId);
+    const style = node.parentId === null
+      ? { ...node.style, fontSize: node.style?.fontSize ?? ROOT_FONT_SIZE }
+      : node.style;
     if (node.widthConstrained) {
-      const { height } = this.textMeasurer.reflow(node.text, node.width, node.style);
+      const { height } = this.textMeasurer.reflow(node.text, node.width, style);
       node.height = height;
     } else {
-      const { width, height } = this.textMeasurer.measure(node.text, node.style);
+      const { width, height } = this.textMeasurer.measure(node.text, style);
       node.width = width;
       node.height = height;
     }

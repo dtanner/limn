@@ -2,6 +2,7 @@
 // ABOUTME: Displays a rounded rectangle with text, selection highlight, and collapse indicator.
 
 import type { MindMapNode } from "@mindforge/core";
+import { ROOT_FONT_SIZE } from "@mindforge/core";
 
 const BORDER_RADIUS = 6;
 const PADDING_X = 10;
@@ -20,11 +21,14 @@ interface NodeViewProps {
 export function NodeView({ node, isSelected, isRoot, isReparentTarget, imageUrl }: NodeViewProps) {
   const lines = node.text.split("\n");
   const hasImage = node.image && imageUrl;
-  const textHeight = PADDING_Y * 2 + lines.length * LINE_HEIGHT;
+  const fontSize = isRoot ? ROOT_FONT_SIZE : FONT_SIZE;
+  const lineHeight = isRoot ? Math.round(ROOT_FONT_SIZE * (LINE_HEIGHT / FONT_SIZE)) : LINE_HEIGHT;
+  const paddingY = isRoot ? Math.round(ROOT_FONT_SIZE * (PADDING_Y / FONT_SIZE)) : PADDING_Y;
+  const textHeight = paddingY * 2 + lines.length * lineHeight;
 
   const fillColor = isReparentTarget ? "#fef3c7" : isSelected ? "#dbeafe" : "#ffffff";
   const strokeColor = isReparentTarget ? "#f59e0b" : isSelected ? "#3b82f6" : "#d1d5db";
-  const strokeWidth = isReparentTarget ? 2 : isSelected ? 2 : 1;
+  const strokeWidth = isReparentTarget ? 2 : isRoot ? 2 : isSelected ? 2 : 1;
   const fontWeight = isRoot ? 600 : 400;
 
   const FOCUS_OFFSET = 3;
@@ -111,8 +115,8 @@ export function NodeView({ node, isSelected, isRoot, isReparentTarget, imageUrl 
         <text
           key={i}
           x={PADDING_X}
-          y={PADDING_Y + FONT_SIZE + i * LINE_HEIGHT}
-          fontSize={FONT_SIZE}
+          y={paddingY + fontSize + i * lineHeight}
+          fontSize={fontSize}
           fontWeight={fontWeight}
           fontFamily="system-ui, -apple-system, sans-serif"
           fill="#1f2937"
