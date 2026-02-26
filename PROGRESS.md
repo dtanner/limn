@@ -397,12 +397,16 @@
 - Minimum image width 40px, single undo entry
 - 5 tests added
 
+**Performance benchmarks:**
+- 500-node tree: build <500ms, navigate <50ms, collapse <50ms, serialize <100ms, deserialize <100ms
+- 1000-node tree: build <2s, navigate <100ms, serialize <200ms, undo/redo <50ms
+- 9 benchmarks, all passing within thresholds
+
 ---
 
 ## Remaining gaps (not blocking, could be future work)
 - Zip fallback for maps with images on non-Chromium browsers (fflate)
 - PDF export (spec soft requirement S1)
-- Performance benchmarks at 500 and 1000 nodes
 - axe-core accessibility audit
 - Playwright visual regression and offline simulation tests
 - Edge animation (edges currently snap, nodes animate)
