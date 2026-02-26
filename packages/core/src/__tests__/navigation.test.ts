@@ -171,12 +171,12 @@ describe("Spatial navigation", () => {
       editor.loadJSON(rootWithThreeChildren());
     });
 
-    test("navigateDown from c1 selects root or c2 (nearest below, tie broken by smallest x)", () => {
-      // c1 center=-36, root center=16, c2 center=16 -- both at dist=52
-      // Tiebreaker: smallest x = root(0) over c2(250)
+    test("navigateDown from c1 selects c2 (same y-distance as root but closer in x)", () => {
+      // c1 center=(300,-36), root center=(50,16), c2 center=(300,16)
+      // Both at yDist=52 but c2 is at the same x, root is 250px away
       editor.select("c1");
       editor.navigateDown();
-      expect(editor.getSelectedId()).toBe("root");
+      expect(editor.getSelectedId()).toBe("c2");
     });
 
     test("navigateDown from c2 selects c3", () => {
@@ -191,12 +191,12 @@ describe("Spatial navigation", () => {
       expect(editor.getSelectedId()).toBe("c3");
     });
 
-    test("navigateUp from c3 selects root or c2 (nearest above, tie broken by smallest x)", () => {
-      // c3 center=68, root center=16, c2 center=16 -- both at dist=52
-      // Tiebreaker: smallest x = root(0) over c2(250)
+    test("navigateUp from c3 selects c2 (same y-distance as root but closer in x)", () => {
+      // c3 center=(300,68), root center=(50,16), c2 center=(300,16)
+      // Both at yDist=52 but c2 is at the same x, root is 250px away
       editor.select("c3");
       editor.navigateUp();
-      expect(editor.getSelectedId()).toBe("root");
+      expect(editor.getSelectedId()).toBe("c2");
     });
 
     test("navigateUp from c2 selects c1", () => {
@@ -224,6 +224,35 @@ describe("Spatial navigation", () => {
       // c3 center = 68 -- below
       // So navigateDown from root should select c3
       expect(editor.getSelectedId()).toBe("c3");
+    });
+
+    test("navigateDown prefers nearby sibling over distant grandchild", () => {
+      // Reproduce Ted's bug: "Web App" down should go to "Persistence", not "new box"
+      const file: MindMapFileFormat = {
+        version: 1,
+        meta: { id: "test", theme: "default", version: 1 },
+        camera: { x: 0, y: 0, zoom: 1 },
+        roots: [{
+          id: "root", text: "Root", x: 0, y: 0, width: 100, height: NODE_HEIGHT,
+          children: [
+            { id: "c1", text: "Sibling A", x: 250, y: -52, width: 100, height: NODE_HEIGHT, children: [] },
+            {
+              id: "c2", text: "Sibling B", x: 250, y: 52, width: 100, height: NODE_HEIGHT,
+              children: [{
+                id: "gc1", text: "Grandchild", x: 500, y: 20, width: 100, height: NODE_HEIGHT,
+                children: [],
+              }],
+            },
+          ],
+        }],
+        assets: [],
+      };
+      editor.loadJSON(file);
+      editor.select("c1");
+      // Grandchild is closer in y (center 36 vs 68) but far in x (550 vs 300)
+      // Should select Sibling B, not Grandchild
+      editor.navigateDown();
+      expect(editor.getSelectedId()).toBe("c2");
     });
   });
 

@@ -431,19 +431,22 @@ export class Editor {
   navigateUp(): void {
     if (this.selectedId === null) { this.selectNearestToViewportCenter(); return; }
     const current = this.store.getNode(this.selectedId);
+    const currentCenterX = current.x + current.width / 2;
     const currentCenterY = current.y + current.height / 2;
     const visible = this.store.getVisibleNodes();
 
     let best: MindMapNode | null = null;
-    let bestDist = Infinity;
+    let bestScore = Infinity;
     for (const node of visible) {
       if (node.id === this.selectedId) continue;
       const centerY = node.y + node.height / 2;
       if (centerY >= currentCenterY) continue; // Not above
-      const dist = currentCenterY - centerY;
-      if (dist < bestDist || (dist === bestDist && best !== null && node.x < best.x)) {
+      const yDist = currentCenterY - centerY;
+      const xDist = Math.abs((node.x + node.width / 2) - currentCenterX);
+      const score = yDist + xDist * 0.5;
+      if (score < bestScore) {
         best = node;
-        bestDist = dist;
+        bestScore = score;
       }
     }
 
@@ -456,19 +459,22 @@ export class Editor {
   navigateDown(): void {
     if (this.selectedId === null) { this.selectNearestToViewportCenter(); return; }
     const current = this.store.getNode(this.selectedId);
+    const currentCenterX = current.x + current.width / 2;
     const currentCenterY = current.y + current.height / 2;
     const visible = this.store.getVisibleNodes();
 
     let best: MindMapNode | null = null;
-    let bestDist = Infinity;
+    let bestScore = Infinity;
     for (const node of visible) {
       if (node.id === this.selectedId) continue;
       const centerY = node.y + node.height / 2;
       if (centerY <= currentCenterY) continue; // Not below
-      const dist = centerY - currentCenterY;
-      if (dist < bestDist || (dist === bestDist && best !== null && node.x < best.x)) {
+      const yDist = centerY - currentCenterY;
+      const xDist = Math.abs((node.x + node.width / 2) - currentCenterX);
+      const score = yDist + xDist * 0.5;
+      if (score < bestScore) {
         best = node;
-        bestDist = dist;
+        bestScore = score;
       }
     }
 
