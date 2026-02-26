@@ -28,7 +28,7 @@ export function NodeView({ node, isSelected, isRoot, isReparentTarget, imageUrl 
   const fontWeight = isRoot ? 600 : 400;
 
   return (
-    <g transform={`translate(${node.x}, ${node.y})`}>
+    <g>
       {/* Drop shadow */}
       <rect
         width={node.width}

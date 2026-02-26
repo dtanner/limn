@@ -306,22 +306,29 @@ export function MindMapCanvas() {
               child={edge.child}
             />
           ))}
-          {visibleNodes.map((node) => (
-            <g
-              key={node.id}
-              data-node-id={node.id}
-              onDoubleClick={() => handleNodeDoubleClick(node.id)}
-              style={{ cursor: isDragging ? "grabbing" : "pointer" }}
-            >
-              <NodeView
-                node={node}
-                isSelected={node.id === selectedId}
-                isRoot={rootIds.has(node.id)}
-                isReparentTarget={node.id === reparentTargetId}
-                imageUrl={node.image ? assetUrls.get(node.image.assetId) : undefined}
-              />
-            </g>
-          ))}
+          {visibleNodes.map((node) => {
+            const shouldAnimate = !isDragging;
+            return (
+              <g
+                key={node.id}
+                data-node-id={node.id}
+                onDoubleClick={() => handleNodeDoubleClick(node.id)}
+                style={{
+                  cursor: isDragging ? "grabbing" : "pointer",
+                  transform: `translate(${node.x}px, ${node.y}px)`,
+                  transition: shouldAnimate ? "transform 200ms ease-out" : "none",
+                }}
+              >
+                <NodeView
+                  node={node}
+                  isSelected={node.id === selectedId}
+                  isRoot={rootIds.has(node.id)}
+                  isReparentTarget={node.id === reparentTargetId}
+                  imageUrl={node.image ? assetUrls.get(node.image.assetId) : undefined}
+                />
+              </g>
+            );
+          })}
           {reparentTargetId && isDragging && selectedId && (
             <ReparentIndicator
               draggedNode={editor.getNode(selectedId)}
