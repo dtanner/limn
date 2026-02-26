@@ -185,9 +185,9 @@ describe("serialization", () => {
       });
       expect(result.version).toBe(1);
       expect(result.roots).toHaveLength(1);
-      expect(result.roots[0].text).toBe("Root");
-      expect(result.roots[0].children).toHaveLength(1);
-      expect(result.roots[0].children[0].text).toBe("Child");
+      expect(result.roots[0]!.text).toBe("Root");
+      expect(result.roots[0]!.children).toHaveLength(1);
+      expect(result.roots[0]!.children[0]!.text).toBe("Child");
     });
 
     test("omits collapsed when false", () => {
@@ -198,7 +198,7 @@ describe("serialization", () => {
         version: 1,
         theme: "default",
       });
-      expect(result.roots[0].collapsed).toBeUndefined();
+      expect(result.roots[0]!.collapsed).toBeUndefined();
     });
 
     test("includes collapsed when true", () => {
@@ -210,7 +210,7 @@ describe("serialization", () => {
         version: 1,
         theme: "default",
       });
-      expect(result.roots[0].collapsed).toBe(true);
+      expect(result.roots[0]!.collapsed).toBe(true);
     });
 
     test("omits widthConstrained when false", () => {
@@ -221,7 +221,7 @@ describe("serialization", () => {
         version: 1,
         theme: "default",
       });
-      expect(result.roots[0].widthConstrained).toBeUndefined();
+      expect(result.roots[0]!.widthConstrained).toBeUndefined();
     });
 
     test("includes widthConstrained when true", () => {
@@ -233,37 +233,37 @@ describe("serialization", () => {
         version: 1,
         theme: "default",
       });
-      expect(result.roots[0].widthConstrained).toBe(true);
+      expect(result.roots[0]!.widthConstrained).toBe(true);
     });
   });
 
   describe("round-trip", () => {
     test("deserialize then serialize preserves structure", () => {
       const store = deserialize(sampleFile);
-      const result = serialize(store, sampleFile.meta);
+      const result = serialize(store, { ...sampleFile.meta, version: 1 });
       expect(result.roots).toHaveLength(sampleFile.roots.length);
-      expect(result.roots[0].id).toBe(sampleFile.roots[0].id);
-      expect(result.roots[0].text).toBe(sampleFile.roots[0].text);
-      expect(result.roots[0].children).toHaveLength(
-        sampleFile.roots[0].children.length,
+      expect(result.roots[0]!.id).toBe(sampleFile.roots[0]!.id);
+      expect(result.roots[0]!.text).toBe(sampleFile.roots[0]!.text);
+      expect(result.roots[0]!.children).toHaveLength(
+        sampleFile.roots[0]!.children.length,
       );
     });
 
     test("round-trip preserves positions", () => {
       const store = deserialize(sampleFile);
-      const result = serialize(store, sampleFile.meta);
-      expect(result.roots[0].x).toBe(sampleFile.roots[0].x);
-      expect(result.roots[0].y).toBe(sampleFile.roots[0].y);
-      expect(result.roots[0].children[0].x).toBe(
-        sampleFile.roots[0].children[0].x,
+      const result = serialize(store, { ...sampleFile.meta, version: 1 });
+      expect(result.roots[0]!.x).toBe(sampleFile.roots[0]!.x);
+      expect(result.roots[0]!.y).toBe(sampleFile.roots[0]!.y);
+      expect(result.roots[0]!.children[0]!.x).toBe(
+        sampleFile.roots[0]!.children[0]!.x,
       );
     });
 
     test("round-trip preserves collapsed state", () => {
       const store = deserialize(sampleFile);
-      const result = serialize(store, sampleFile.meta);
-      expect(result.roots[0].children[1].collapsed).toBe(true);
-      expect(result.roots[0].children[0].collapsed).toBeUndefined();
+      const result = serialize(store, { ...sampleFile.meta, version: 1 });
+      expect(result.roots[0]!.children[1]!.collapsed).toBe(true);
+      expect(result.roots[0]!.children[0]!.collapsed).toBeUndefined();
     });
   });
 

@@ -14,7 +14,7 @@ function buildTree(editor: TestEditor, nodeCount: number): string[] {
   let i = 1;
   let parentIdx = 0;
   while (i < nodeCount) {
-    const parentId = ids[parentIdx];
+    const parentId = ids[parentIdx]!;
     const childId = editor.addChild(parentId, `Node ${i}`);
     editor.exitEditMode();
     ids.push(childId);

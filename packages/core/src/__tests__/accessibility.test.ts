@@ -9,7 +9,7 @@ describe("accessibility data", () => {
     const editor = new TestEditor();
     editor.addRoot("Root", 0, 0);
     editor.exitEditMode();
-    const rootId = editor.getRoots()[0].id;
+    const rootId = editor.getRoots()[0]!.id;
     expect(editor.getNodeDepth(rootId)).toBe(0);
   });
 
@@ -17,19 +17,19 @@ describe("accessibility data", () => {
     const editor = new TestEditor();
     editor.addRoot("Root", 0, 0);
     editor.exitEditMode();
-    const rootId = editor.getRoots()[0].id;
+    const rootId = editor.getRoots()[0]!.id;
     editor.select(rootId);
     editor.addChild(rootId, "Child");
     editor.exitEditMode();
     const children = editor.getChildren(rootId);
-    expect(editor.getNodeDepth(children[0].id)).toBe(1);
+    expect(editor.getNodeDepth(children[0]!.id)).toBe(1);
   });
 
   it("getNodeDepth returns 2 for grandchildren", () => {
     const editor = new TestEditor();
     editor.addRoot("Root", 0, 0);
     editor.exitEditMode();
-    const rootId = editor.getRoots()[0].id;
+    const rootId = editor.getRoots()[0]!.id;
     const childId = editor.addChild(rootId, "Child");
     editor.exitEditMode();
     const grandchildId = editor.addChild(childId, "Grandchild");
@@ -41,7 +41,7 @@ describe("accessibility data", () => {
     const editor = new TestEditor();
     editor.addRoot("Root", 0, 0);
     editor.exitEditMode();
-    const rootId = editor.getRoots()[0].id;
+    const rootId = editor.getRoots()[0]!.id;
     editor.addChild(rootId, "Child");
     editor.exitEditMode();
     expect(editor.hasVisibleChildren(rootId)).toBe(true);
@@ -51,7 +51,7 @@ describe("accessibility data", () => {
     const editor = new TestEditor();
     editor.addRoot("Root", 0, 0);
     editor.exitEditMode();
-    const rootId = editor.getRoots()[0].id;
+    const rootId = editor.getRoots()[0]!.id;
     editor.addChild(rootId, "Child");
     editor.exitEditMode();
     editor.toggleCollapse(rootId);
@@ -62,7 +62,7 @@ describe("accessibility data", () => {
     const editor = new TestEditor();
     editor.addRoot("Root", 0, 0);
     editor.exitEditMode();
-    const rootId = editor.getRoots()[0].id;
+    const rootId = editor.getRoots()[0]!.id;
     expect(editor.hasVisibleChildren(rootId)).toBe(false);
   });
 });

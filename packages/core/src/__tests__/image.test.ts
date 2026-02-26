@@ -42,7 +42,7 @@ describe("image support", () => {
     editor.setNodeImage("n0", asset, 400, 300);
 
     expect(editor.getAssets()).toHaveLength(1);
-    expect(editor.getAssets()[0].id).toBe("a1");
+    expect(editor.getAssets()[0]!.id).toBe("a1");
   });
 
   it("should not duplicate assets when setting same image on multiple nodes", () => {
@@ -110,8 +110,8 @@ describe("image support", () => {
 
     const json = editor.toJSON();
     expect(json.assets).toHaveLength(1);
-    expect(json.assets[0].id).toBe("a1");
-    expect(json.roots[0].image).toEqual({ assetId: "a1", width: 400, height: 300 });
+    expect(json.assets[0]!.id).toBe("a1");
+    expect(json.roots[0]!.image).toEqual({ assetId: "a1", width: 400, height: 300 });
 
     // Load into a new editor
     const editor2 = new TestEditor();

@@ -403,7 +403,7 @@ describe("MindMapStore", () => {
       const node = store.getNode(rootId);
       expect(node.image).toEqual({ assetId: "a1", width: 400, height: 300 });
       expect(store.getAssets()).toHaveLength(1);
-      expect(store.getAssets()[0].id).toBe("a1");
+      expect(store.getAssets()[0]!.id).toBe("a1");
     });
 
     test("does not duplicate assets", () => {
