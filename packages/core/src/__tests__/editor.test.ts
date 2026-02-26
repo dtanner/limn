@@ -386,6 +386,22 @@ describe("Editor", () => {
       editor.undo(); // undo setText
       editor.expectText("n0", "Root");
     });
+
+    test("updates node dimensions via text measurer", () => {
+      // Stub measurer: width = max(chars * 8 + 16, 100), height = lines * 20 + 12
+      editor.setText("n0", "A much longer text string for testing");
+      const node = editor.getNode("n0");
+      // "A much longer text string for testing" = 37 chars → 37 * 8 + 16 = 312
+      expect(node.width).toBe(312);
+      expect(node.height).toBe(32); // 1 line * 20 + 12
+    });
+
+    test("updates dimensions for multi-line text", () => {
+      editor.setText("n0", "Line 1\nLine 2\nLine 3");
+      const node = editor.getNode("n0");
+      // 3 lines → height = 3 * 20 + 12 = 72
+      expect(node.height).toBe(72);
+    });
   });
 
   describe("toggleCollapse", () => {

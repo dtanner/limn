@@ -372,6 +372,7 @@ export class Editor {
       this.pushUndo(squashLabel);
     }
     this.store.setText(nodeId, text);
+    this.remeasureNode(nodeId);
     this.notify();
   }
 
@@ -771,6 +772,19 @@ export class Editor {
       }
     }
     this.editing = false;
+  }
+
+  /** Update a node's dimensions using the text measurer. */
+  private remeasureNode(nodeId: string): void {
+    const node = this.store.getNode(nodeId);
+    if (node.widthConstrained) {
+      const { height } = this.textMeasurer.reflow(node.text, node.width, node.style);
+      node.height = height;
+    } else {
+      const { width, height } = this.textMeasurer.measure(node.text, node.style);
+      node.width = width;
+      node.height = height;
+    }
   }
 
   /** Find the root of a node and resolve cross-tree overlap. */

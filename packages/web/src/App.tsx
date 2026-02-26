@@ -13,6 +13,7 @@ import { setupAutoSave, loadFromIDB } from "./persistence/local";
 import { saveToFile, openFile } from "./persistence/file";
 import { exportSvg } from "./export/svg";
 import { decompressFromUrl } from "@mindforge/core";
+import { domTextMeasurer } from "./text/DomTextMeasurer";
 
 const DEMO_MAP: MindMapFileFormat = {
   version: 1,
@@ -69,7 +70,7 @@ const DEMO_MAP: MindMapFileFormat = {
 const DOC_ID = "demo";
 
 export function App() {
-  const editor = useMemo(() => new Editor(), []);
+  const editor = useMemo(() => new Editor(domTextMeasurer), []);
   const [loaded, setLoaded] = useState(false);
 
   // Load from URL hash, IndexedDB, or fall back to demo map
