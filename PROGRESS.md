@@ -79,17 +79,20 @@
 
 ### Then: Chunk 4 — Editor + TestEditor
 
-**Goal:** Editor class with all core operations, diff-based undo, and TestEditor for simulated interaction.
+**Goal:** Editor class with all core operations, diff-based undo, key-to-action dispatch, and TestEditor for simulated interaction.
 
 **Acceptance criteria:**
 - [ ] Editor wraps store, exposes full mutation API
+- [ ] Editor accepts a TextMeasurer interface (DI); tests use a stub measurer
 - [ ] Every mutation produces a tracked diff
 - [ ] markHistory/undo/redo work correctly
 - [ ] Selection and navigation methods work
 - [ ] Nav mode / edit mode state machine
-- [ ] TestEditor simulates keyDown/keyUp/pressKey/pointerDown/type
+- [ ] Key-to-action dispatch table in `core/src/keybindings/` (maps keys to Editor methods; shared by web input handler and TestEditor)
+- [ ] Simple position heuristics for node creation (child offset from parent, siblings stacked vertically); replaced by proper layout engine in Chunk 5
+- [ ] TestEditor simulates keyDown/keyUp/pressKey/pointerDown/type (routed through dispatch)
 - [ ] TestEditor assertion methods (expectSelected, expectEditing, etc.)
-- [ ] 30+ tests covering operations, undo/redo, keyboard simulation
+- [ ] 30+ tests covering operations, undo/redo, keyboard simulation via dispatch
 
 ---
 

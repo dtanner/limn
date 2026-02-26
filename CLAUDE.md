@@ -29,7 +29,7 @@ bun run build        # Production build
 ## Architecture invariants
 
 - **Editor is the sole source of truth.** All mutations go through Editor methods. DOM renders from Editor state, never writes to it.
-- **Core has zero browser dependencies.** Nothing in `packages/core/` imports React, DOM APIs, or browser globals.
+- **Core has zero browser dependencies.** Nothing in `packages/core/` imports React, DOM APIs, or browser globals. Text measurement uses a `TextMeasurer` interface (DI); web provides a DOM-based implementation, tests provide a stub.
 - **Diff-based undo.** Store captures diffs automatically. No Command classes.
 - **Positions are stored.** Layout engine computes initial positions; users can reposition nodes by dragging. File format includes x/y coordinates.
 - **Images use sidecar storage.** `file.mindmap` + `file.assets/` directory. Never base64 in JSON.

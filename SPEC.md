@@ -99,9 +99,10 @@ Excalidraw proved this model: they deprecated their Electron app because the web
 1. **The Editor is the source of truth, not the DOM.** All state mutations flow through the Editor API. The DOM is a rendering target. This enables the TestEditor pattern.
 2. **Diff-based undo, not command-based.** The store captures diffs for every mutation automatically. Undo inverts the diff. No need to maintain Command classes for every operation.
 3. **Flat runtime model, nested file format.** In memory, nodes live in a flat Map keyed by ID with both `parentId` and `children[]` references (O(1) parent lookup, ordered child traversal). On disk, they serialize as a nested tree (clean diffs, human-readable).
-4. **Positions and dimensions are stored.** The layout engine (dagre) computes positions for newly created trees. Incremental mutations shift siblings to make or close space. Users can reposition nodes by dragging. Manual positions are never overridden by automatic layout. The file format includes x/y/width/height for every node. Node width behavior: new nodes have no fixed width -- text extends horizontally as the user types, and the node grows to fit. Once a user manually constrains the width (by dragging the right edge), text reflows within that width and height adjusts automatically. The `width` field in the file format stores either the measured single-line width or the user-constrained width. Default dimensions for newly created nodes are 120x30. Height is always auto-computed: from text content width when unconstrained, or from text reflow when width is constrained.
+4. **Positions and dimensions are stored.** The layout engine (dagre) computes positions for newly created trees. Incremental mutations shift siblings to make or close space. Users can reposition nodes by dragging. Manual positions are never overridden by automatic layout. The file format includes x/y/width/height for every node. Node width behavior: new nodes have no fixed width -- text extends horizontally as the user types, and the node grows to fit. Once a user manually constrains the width (by dragging the right edge), text reflows within that width and height adjusts automatically. The `width` field in the file format stores either the measured single-line width or the user-constrained width. When a node is first created (before text measurement), it receives initial dimensions of 100x32 (reasonable for single-line text at default font size with padding). These are immediately updated by the TextMeasurer once text is entered. Height is always derived from text content -- never set independently.
 5. **Multiple roots (forest).** A mind map can contain multiple independent root trees on the same canvas. Roots can be created and deleted freely. An empty canvas is a valid state.
 6. **Images stored as sidecar files.** Binary assets live in a `{name}.assets/` directory alongside the JSON file, referenced by relative path. This keeps the JSON diffable and the assets manageable in git.
+7. **Text measurement via dependency injection.** Core accepts a `TextMeasurer` interface for computing node dimensions from text content. The web layer provides a DOM-based implementation (off-screen element measurement). Tests provide a stub (e.g., character-count heuristic). This keeps core browser-free while allowing accurate text layout.
 
 ### Package/module structure
 
@@ -183,6 +184,12 @@ interface MindMap {
   };
 }
 
+// Text measurement (dependency-injected; core is browser-free)
+interface TextMeasurer {
+  measure(text: string, style?: NodeStyle): { width: number; height: number };
+  reflow(text: string, maxWidth: number, style?: NodeStyle): { width: number; height: number };
+}
+
 // File format types (on-disk representation)
 interface MindMapFileNode {
   id: string;
@@ -227,7 +234,7 @@ On disk, the flat map serializes as a nested tree for readability and clean diff
       "x": 0,
       "y": 0,
       "width": 120,
-      "height": 30,
+      "height": 32,
       "children": [
         {
           "id": "n1",
@@ -235,16 +242,16 @@ On disk, the flat map serializes as a nested tree for readability and clean diff
           "x": 250,
           "y": -60,
           "width": 100,
-          "height": 30,
+          "height": 32,
           "children": [
-            { "id": "n3", "text": "Research", "x": 480, "y": -90, "width": 100, "height": 30, "children": [] },
+            { "id": "n3", "text": "Research", "x": 480, "y": -90, "width": 100, "height": 32, "children": [] },
             {
               "id": "n4",
               "text": "Architecture",
               "x": 480,
               "y": -30,
               "width": 100,
-              "height": 30,
+              "height": 32,
               "children": [],
               "image": { "assetId": "a1", "width": 400, "height": 300 }
             }
@@ -256,10 +263,10 @@ On disk, the flat map serializes as a nested tree for readability and clean diff
           "x": 250,
           "y": 60,
           "width": 100,
-          "height": 30,
+          "height": 32,
           "collapsed": true,
           "children": [
-            { "id": "n5", "text": "Implementation", "x": 480, "y": 60, "width": 120, "height": 30, "children": [] }
+            { "id": "n5", "text": "Implementation", "x": 480, "y": 60, "width": 120, "height": 32, "children": [] }
           ]
         }
       ]
@@ -408,7 +415,7 @@ The app has two distinct modes, following the MindNode/Excel paradigm:
 
 **Edit mode** (entered via Enter when node is selected, or double-click on node): Keyboard input goes to an absolutely-positioned textarea overlaid on the node (not SVG foreignObject, which has cross-browser issues). Arrow keys move within text. If text is already in node, cursor starts at the end of the current text. Escape exits to navigation mode. Creating a new node (Tab) automatically enters edit mode for that node. Nodes support multi-line text: Shift+Enter inserts a newline, Enter exits edit mode and creates a sibling, Tab exits edit mode and creates a child.
 
-**Empty node cleanup:** If a user exits edit mode (Escape) on a node with empty text, the node is automatically deleted. Selection falls back to the previous sibling if one exists, otherwise to the parent, otherwise to the nearest root by position, otherwise nothing is selected (empty canvas).
+**Empty node cleanup:** If a user exits edit mode (Escape) on a node with empty text, the node is automatically deleted. Selection fallback follows the same rules as Backspace delete: nearest sibling (previous, or next if first), then parent if no siblings, then nearest remaining root by position if a root was deleted, then nothing selected if canvas is empty.
 
 ### Browser shortcut conflicts
 
@@ -458,7 +465,7 @@ Arrow keys navigate spatially based on screen position, not tree structure. The 
 - **Right-side branches** (child.x > parent.x): Left moves toward parent, Right moves toward first child (expands if collapsed).
 - **Left-side branches** (child.x < parent.x): Right moves toward parent, Left moves toward first child (expands if collapsed).
 - **At a root node**: Left goes to first left-side child (if any), Right goes to first right-side child (if any).
-- **Up/Down**: Move to the nearest visible node above/below the current node by y position. Can cross parent boundaries and tree boundaries. No-op at the topmost/bottommost visible node.
+- **Up/Down**: Move to the nearest visible node above/below the current node by pure y-distance. When multiple nodes share the same y-distance, prefer the node with the smallest x coordinate. Can cross parent boundaries and tree boundaries. No-op at the topmost/bottommost visible node.
 
 Direction of a branch is inferred from stored positions: if a child's x coordinate is less than its parent's x, it is a left-side branch. All navigation directions are no-ops when there is no node to move to (e.g., Left/Right at a leaf or childless side of a root).
 
@@ -474,8 +481,9 @@ The default direction for new children is rightward from their parent. If a user
 
 The algorithm:
 - **Horizontal placement:** When a node gains its first child, the child is placed at a fixed horizontal offset from the parent (in the branch's direction -- rightward or leftward). This offset is a constant (e.g., 250px). Subsequent children at the same depth reuse the same x position.
+- **Vertical placement of new children:** A new child is centered on its parent's y coordinate. When a parent already has children, the new child is appended below the last sibling with a fixed inter-sibling gap (e.g., 20px), and the parent's other children are shifted to keep the group centered on the parent.
 - **Vertical shifting:** When a node is inserted or removed, compute the delta in the parent's visible subtree height (sum of visible descendant heights plus fixed inter-sibling gaps). Shift all siblings below the affected position by that delta, moving each sibling and its entire subtree as a rigid unit. The inter-sibling gap is a fixed constant (e.g., 20px).
-- **Cross-tree overlap:** Each root tree is adjusted independently. After adjusting a tree, check whether its bounding box overlaps any other root tree's bounding box; if so, push the overlapping tree apart by the overlap distance.
+- **Cross-tree overlap:** Each root tree is adjusted independently. After adjusting a tree, check whether its bounding box overlaps any other root tree's bounding box; if so, push the overlapping tree away from the changed tree's center by the overlap distance plus a padding gap.
 
 This preserves any manual positioning the user has done -- only the affected siblings and their subtrees are shifted.
 
@@ -608,7 +616,7 @@ Each chunk is scoped to be completable in a single Claude Code session (~100–5
 | **1. Scaffold** | TypeScript project with Vitest, build pipeline, CLAUDE.md, PROGRESS.md | `core/` and `web/` package structure; `bun install && bun run test` passes | Smoke test |
 | **2. Data model** | MindMapNode (with x/y), MindMap (with roots[]) types; flat store with parentId references; tree operations (add child, add sibling, add root, delete, reparent, reorder) | `core/src/model/`, `core/src/store/` | Unit tests for all tree operations including multi-root |
 | **3. Serialization** | JSON round-trip (nested file ↔ flat runtime); markdown export; file format validation with zod | `core/src/serialization/` | Serialize → deserialize → equality; snapshot tests for markdown output |
-| **4. Editor + TestEditor** | Editor class with store, mutation methods, history marks, diff-based undo/redo; TestEditor with simulated keyboard/pointer input and assertion methods | `core/src/editor/`, `core/src/test-editor/` | Undo/redo tests; keyboard simulation tests; history inspection tests |
+| **4. Editor + TestEditor** | Editor class with store, mutation methods, history marks, diff-based undo/redo; key-to-action dispatch table (maps keys to Editor methods, shared by web input handler and TestEditor); TestEditor with simulated keyboard/pointer input and assertion methods; simple position heuristics for node creation (replaced by proper layout in Chunk 5) | `core/src/editor/`, `core/src/keybindings/`, `core/src/test-editor/` | Undo/redo tests; keyboard simulation tests via dispatch; history inspection tests |
 
 ### Phase 2 — Layout and rendering (Chunks 5–7)
 
