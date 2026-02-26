@@ -198,6 +198,14 @@ const bindings: KeyBinding[] = [
       editor.requestOpen();
     },
   },
+  {
+    key: "e",
+    modifiers: { meta: true, shift: true },
+    mode: "both",
+    action: (editor) => {
+      editor.requestExport();
+    },
+  },
 ];
 
 /**

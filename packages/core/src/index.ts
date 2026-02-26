@@ -30,6 +30,8 @@ export type {
 
 export { CURRENT_FORMAT_VERSION, migrateToLatest } from "./serialization/migration";
 
+export { compressToUrl, decompressFromUrl } from "./export/url";
+
 export {
   subtreeHeight,
   branchDirection,

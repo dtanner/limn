@@ -11,6 +11,8 @@ import { UpdateBanner } from "./components/UpdateBanner";
 import { useKeyboardHandler } from "./input/useKeyboardHandler";
 import { setupAutoSave, loadFromIDB } from "./persistence/local";
 import { saveToFile, openFile } from "./persistence/file";
+import { exportSvg } from "./export/svg";
+import { decompressFromUrl } from "@mindforge/core";
 
 const DEMO_MAP: MindMapFileFormat = {
   version: 1,
@@ -70,8 +72,19 @@ export function App() {
   const editor = useMemo(() => new Editor(), []);
   const [loaded, setLoaded] = useState(false);
 
-  // Load from IndexedDB or fall back to demo map
+  // Load from URL hash, IndexedDB, or fall back to demo map
   useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.startsWith("#data=")) {
+      const compressed = hash.slice(6);
+      const data = decompressFromUrl(compressed);
+      if (data) {
+        editor.loadJSON(data);
+        setLoaded(true);
+        return;
+      }
+    }
+
     loadFromIDB(DOC_ID).then((saved) => {
       editor.loadJSON(saved ?? DEMO_MAP);
       setLoaded(true);
@@ -86,11 +99,10 @@ export function App() {
     });
   }, [editor, loaded]);
 
-  // Wire Cmd+S and Cmd+O to file save/open
+  // Wire Cmd+S, Cmd+O, Shift+Cmd+E to file/export actions
   useEffect(() => {
     editor.onSave(() => {
       saveToFile(editor).catch((err) => {
-        // User cancelled the dialog or save failed
         if (err instanceof DOMException && err.name === "AbortError") return;
         console.error("Save failed:", err);
       });
@@ -100,6 +112,9 @@ export function App() {
         if (err instanceof DOMException && err.name === "AbortError") return;
         console.error("Open failed:", err);
       });
+    });
+    editor.onExport(() => {
+      exportSvg();
     });
   }, [editor]);
 

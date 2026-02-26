@@ -285,6 +285,7 @@ export function MindMapCanvas() {
     >
       <svg
         ref={svgRef}
+        data-mindforge-canvas
         style={{
           width: "100%",
           height: "100%",

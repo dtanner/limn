@@ -66,6 +66,7 @@ export class Editor {
   // External action callbacks (set by web layer)
   private saveCallback: (() => void) | null = null;
   private openCallback: (() => void) | null = null;
+  private exportCallback: (() => void) | null = null;
 
   // Undo/redo
   private undoStack: HistoryEntry[] = [];
@@ -147,6 +148,16 @@ export class Editor {
   /** Request a file open operation (called by dispatch on Cmd+O). */
   requestOpen(): void {
     this.openCallback?.();
+  }
+
+  /** Register a callback for export requests (Shift+Cmd+E). */
+  onExport(cb: () => void): void {
+    this.exportCallback = cb;
+  }
+
+  /** Request an export operation (called by dispatch on Shift+Cmd+E). */
+  requestExport(): void {
+    this.exportCallback?.();
   }
 
   // --- Subscription (for useSyncExternalStore) ---
