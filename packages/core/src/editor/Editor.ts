@@ -469,7 +469,7 @@ export class Editor {
     const draggedCenterX = dragged.x + dragged.width / 2;
     const draggedCenterY = dragged.y + dragged.height / 2;
 
-    const PROXIMITY_THRESHOLD = 80;
+    const PROXIMITY_THRESHOLD = 100;
     let bestId: string | null = null;
     let bestDist = PROXIMITY_THRESHOLD;
 

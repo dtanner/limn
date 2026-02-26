@@ -13,14 +13,15 @@ interface NodeViewProps {
   node: MindMapNode;
   isSelected: boolean;
   isRoot: boolean;
+  isReparentTarget?: boolean;
 }
 
-export function NodeView({ node, isSelected, isRoot }: NodeViewProps) {
+export function NodeView({ node, isSelected, isRoot, isReparentTarget }: NodeViewProps) {
   const lines = node.text.split("\n");
 
-  const fillColor = isSelected ? "#dbeafe" : "#ffffff";
-  const strokeColor = isSelected ? "#3b82f6" : "#d1d5db";
-  const strokeWidth = isSelected ? 2 : 1;
+  const fillColor = isReparentTarget ? "#fef3c7" : isSelected ? "#dbeafe" : "#ffffff";
+  const strokeColor = isReparentTarget ? "#f59e0b" : isSelected ? "#3b82f6" : "#d1d5db";
+  const strokeWidth = isReparentTarget ? 2 : isSelected ? 2 : 1;
   const fontWeight = isRoot ? 600 : 400;
 
   return (

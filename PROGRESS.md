@@ -3,7 +3,7 @@
 ## Current status
 
 **Phase**: Phase 3 -- Interaction
-**Next chunk**: Chunk 10 (Collapse/expand + mouse interaction)
+**Next chunk**: Chunk 11 (Image support)
 **Last updated**: 2026-02-26
 
 ---
@@ -225,8 +225,31 @@
 **Tests added:**
 - Visual verification via dev server (text editing is a browser interaction; core text/mode logic already covered by TestEditor tests)
 
-### Up next: Chunk 10
-- Remaining mouse interaction (drag to pan is done, still need drag-to-reposition nodes)
+### Chunk 10: Mouse interaction (2026-02-26)
+
+**What was done:**
+- Drag-to-reposition nodes: pointer down on node starts drag after 4px threshold
+- Entire subtree moves as a rigid unit during drag
+- Drag-to-reparent with proximity detection (100px threshold)
+- Visual reparent indicator: dashed amber line + amber highlight on target node
+- Undo squashing: entire drag (including reparent) is a single undo entry
+- No-op drags (no movement) don't create undo entries
+- TestEditor pointer simulation: pointerDown, pointerMove, pointerUp
+- Refactored MindMapCanvas pointer handling to support both canvas pan and node drag
+- data-node-id attributes on node groups for pointer event targeting
+
+**Files changed:**
+- `packages/core/src/editor/Editor.ts` -- drag state, startDrag/updateDrag/endDrag, proximity detection
+- `packages/core/src/test-editor/TestEditor.ts` -- pointerDown/pointerMove/pointerUp methods
+- `packages/web/src/components/MindMapCanvas.tsx` -- refactored pointer handling for drag vs click vs pan
+- `packages/web/src/components/NodeView.tsx` -- isReparentTarget prop with amber highlight
+- `packages/web/src/components/ReparentIndicator.tsx` -- dashed line SVG component
+
+**Tests added:**
+- 13 drag tests: start/end drag, move to new position, subtree movement, select on drag, single undo, no-op drag, exit edit mode, reparent proximity detection, reparent on drop, no reparent in open space, no reparent to descendant, clear target after drop, reparent undo
+
+### Up next: Chunk 11
+- Image support (drag-and-drop, paste, resize, sidecar storage)
 
 ---
 
@@ -252,3 +275,5 @@
 | 2026-02-25 | Enter=edit mode, not create sibling | In nav mode Enter edits; in edit mode Enter creates sibling; two keystrokes for sibling from nav is acceptable |
 | 2026-02-25 | Incremental layout over full dagre reflow | Dagre for new trees only; add/remove/collapse shifts siblings and subtrees; preserves manual positions; cross-tree overlap detection pushes trees apart |
 | 2026-02-25 | Direction inferred from positions | No explicit side property; child.x < parent.x means left-side branch; simpler data model |
+| 2026-02-26 | 4px drag threshold before starting drag | Distinguishes click-to-select from drag-to-reposition; prevents accidental drags |
+| 2026-02-26 | 100px reparent proximity threshold | Generous enough to be discoverable; uses distance from dragged node center to target edge center |

@@ -7,9 +7,11 @@ import { useEditor } from "../hooks/useEditor";
 import { NodeView } from "./NodeView";
 import { EdgeView } from "./EdgeView";
 import { TextEditor } from "./TextEditor";
+import { ReparentIndicator } from "./ReparentIndicator";
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 3;
+const DRAG_THRESHOLD = 4; // pixels before a pointerDown becomes a drag
 
 export function MindMapCanvas() {
   const editor = useEditor();
@@ -17,10 +19,17 @@ export function MindMapCanvas() {
   const isPanning = useRef(false);
   const lastPointer = useRef({ x: 0, y: 0 });
 
+  // Node drag state
+  const pendingNodeId = useRef<string | null>(null);
+  const pointerStart = useRef({ x: 0, y: 0 });
+  const isDraggingNode = useRef(false);
+
   const camera = editor.getCamera();
   const visibleNodes = editor.getVisibleNodes();
   const selectedId = editor.getSelectedId();
   const isEditing = editor.isEditing();
+  const isDragging = editor.isDragging();
+  const reparentTargetId = editor.getReparentTarget();
   const rootIds = new Set(editor.getRoots().map((r) => r.id));
 
   // Get the editing node for the TextEditor overlay
@@ -76,14 +85,40 @@ export function MindMapCanvas() {
     [editor],
   );
 
+  /** Convert screen coordinates to world coordinates. */
+  const screenToWorld = useCallback(
+    (clientX: number, clientY: number) => {
+      const svg = svgRef.current;
+      if (!svg) return { x: 0, y: 0 };
+      const rect = svg.getBoundingClientRect();
+      const cam = editor.getCamera();
+      return {
+        x: (clientX - rect.left - cam.x) / cam.zoom,
+        y: (clientY - rect.top - cam.y) / cam.zoom,
+      };
+    },
+    [editor],
+  );
+
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
-      // Only pan on middle-click or direct canvas click (not on nodes)
       const target = e.target as SVGElement;
-      if (target.tagName === "svg" || target.classList.contains("canvas-bg")) {
+      const isCanvas = target.tagName === "svg" || target.classList.contains("canvas-bg");
+
+      if (isCanvas) {
+        // Canvas background: start panning
         isPanning.current = true;
         lastPointer.current = { x: e.clientX, y: e.clientY };
-        (e.target as SVGElement).setPointerCapture(e.pointerId);
+        svgRef.current?.setPointerCapture(e.pointerId);
+      } else {
+        // Node element: record for potential drag
+        const nodeGroup = target.closest("[data-node-id]") as SVGElement | null;
+        if (nodeGroup) {
+          pendingNodeId.current = nodeGroup.getAttribute("data-node-id");
+          pointerStart.current = { x: e.clientX, y: e.clientY };
+          isDraggingNode.current = false;
+          svgRef.current?.setPointerCapture(e.pointerId);
+        }
       }
     },
     [],
@@ -91,30 +126,60 @@ export function MindMapCanvas() {
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
-      if (!isPanning.current) return;
-      const dx = e.clientX - lastPointer.current.x;
-      const dy = e.clientY - lastPointer.current.y;
-      lastPointer.current = { x: e.clientX, y: e.clientY };
-      const cam = editor.getCamera();
-      editor.setCamera(cam.x + dx, cam.y + dy, cam.zoom);
-    },
-    [editor],
-  );
-
-  const handlePointerUp = useCallback(() => {
-    isPanning.current = false;
-  }, []);
-
-  const handleNodeClick = useCallback(
-    (nodeId: string) => {
-      if (editor.getSelectedId() === nodeId && !editor.isEditing()) {
-        // Already selected: don't re-select (would trigger unnecessary notify)
+      if (isPanning.current) {
+        const dx = e.clientX - lastPointer.current.x;
+        const dy = e.clientY - lastPointer.current.y;
+        lastPointer.current = { x: e.clientX, y: e.clientY };
+        const cam = editor.getCamera();
+        editor.setCamera(cam.x + dx, cam.y + dy, cam.zoom);
         return;
       }
-      if (editor.isEditing()) {
-        editor.exitEditMode();
+
+      if (pendingNodeId.current !== null) {
+        const dx = e.clientX - pointerStart.current.x;
+        const dy = e.clientY - pointerStart.current.y;
+        const dist = Math.hypot(dx, dy);
+
+        if (!isDraggingNode.current && dist >= DRAG_THRESHOLD) {
+          // Exceeded threshold: start drag
+          isDraggingNode.current = true;
+          const world = screenToWorld(pointerStart.current.x, pointerStart.current.y);
+          editor.startDrag(pendingNodeId.current, world.x, world.y);
+        }
+
+        if (isDraggingNode.current) {
+          const world = screenToWorld(e.clientX, e.clientY);
+          editor.updateDrag(world.x, world.y);
+        }
       }
-      editor.select(nodeId);
+    },
+    [editor, screenToWorld],
+  );
+
+  const handlePointerUp = useCallback(
+    (_e: React.PointerEvent) => {
+      if (isPanning.current) {
+        isPanning.current = false;
+        return;
+      }
+
+      if (pendingNodeId.current !== null) {
+        const nodeId = pendingNodeId.current;
+        if (isDraggingNode.current) {
+          // Was dragging: end drag
+          editor.endDrag();
+        } else {
+          // Was a click (no drag threshold exceeded): select
+          if (editor.isEditing()) {
+            editor.exitEditMode();
+          }
+          if (editor.getSelectedId() !== nodeId || editor.isEditing()) {
+            editor.select(nodeId);
+          }
+        }
+        pendingNodeId.current = null;
+        isDraggingNode.current = false;
+      }
     },
     [editor],
   );
@@ -151,7 +216,7 @@ export function MindMapCanvas() {
         style={{
           width: "100%",
           height: "100%",
-          cursor: isPanning.current ? "grabbing" : "default",
+          cursor: isPanning.current || isDragging ? "grabbing" : "default",
         }}
         onWheel={handleWheel}
         onPointerDown={handlePointerDown}
@@ -171,13 +236,24 @@ export function MindMapCanvas() {
           {visibleNodes.map((node) => (
             <g
               key={node.id}
-              onClick={() => handleNodeClick(node.id)}
+              data-node-id={node.id}
               onDoubleClick={() => handleNodeDoubleClick(node.id)}
-              style={{ cursor: "pointer" }}
+              style={{ cursor: isDragging ? "grabbing" : "pointer" }}
             >
-              <NodeView node={node} isSelected={node.id === selectedId} isRoot={rootIds.has(node.id)} />
+              <NodeView
+                node={node}
+                isSelected={node.id === selectedId}
+                isRoot={rootIds.has(node.id)}
+                isReparentTarget={node.id === reparentTargetId}
+              />
             </g>
           ))}
+          {reparentTargetId && isDragging && selectedId && (
+            <ReparentIndicator
+              draggedNode={editor.getNode(selectedId)}
+              targetNode={editor.getNode(reparentTargetId)}
+            />
+          )}
         </g>
       </svg>
       {editingNode && (
