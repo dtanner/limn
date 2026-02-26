@@ -99,7 +99,7 @@ Excalidraw proved this model: they deprecated their Electron app because the web
 1. **The Editor is the source of truth, not the DOM.** All state mutations flow through the Editor API. The DOM is a rendering target. This enables the TestEditor pattern.
 2. **Diff-based undo, not command-based.** The store captures diffs for every mutation automatically. Undo inverts the diff. No need to maintain Command classes for every operation.
 3. **Flat runtime model, nested file format.** In memory, nodes live in a flat Map keyed by ID with both `parentId` and `children[]` references (O(1) parent lookup, ordered child traversal). On disk, they serialize as a nested tree (clean diffs, human-readable).
-4. **Positions are stored.** The layout engine computes initial positions for new nodes and reflows siblings on structural changes. Users can reposition nodes by dragging. The file format includes x/y coordinates for every node.
+4. **Positions are stored.** The layout engine (dagre) computes positions for newly created trees. Incremental mutations shift siblings to make or close space. Users can reposition nodes by dragging. Manual positions are never overridden by automatic layout. The file format includes x/y coordinates for every node.
 5. **Multiple roots (forest).** A mind map can contain multiple independent root trees on the same canvas. Roots can be created and deleted freely. An empty canvas is a valid state.
 6. **Images stored as sidecar files.** Binary assets live in a `{name}.assets/` directory alongside the JSON file, referenced by relative path. This keeps the JSON diffable and the assets manageable in git.
 
@@ -390,6 +390,10 @@ The app has two distinct modes, following the MindNode/Excel paradigm:
 
 **Edit mode** (entered via Enter when node is selected, or double-click on node): Keyboard input goes to an absolutely-positioned textarea overlaid on the node (not SVG foreignObject, which has cross-browser issues). Arrow keys move within text. If text is already in node, cursor starts at the end of the current text. Escape exits to navigation mode. Creating a new node (Tab) automatically enters edit mode for that node. Nodes support multi-line text: Shift+Enter inserts a newline, Enter exits edit mode and creates a sibling, Tab exits edit mode and creates a child.
 
+### Browser shortcut conflicts
+
+Several shortcuts (⌘+S, ⌘+O, ⌘+0, ⌘+1, ⌘+=, ⌘+-) conflict with browser defaults (save page, open file, reset zoom, etc.). The keyboard handler must call `preventDefault()` on these events to suppress browser behavior. Tab must also be prevented from moving focus out of the app.
+
 ### Keyboard shortcuts (navigation mode)
 
 | Context | Action | Shortcut | Behavior |
@@ -401,7 +405,7 @@ The app has two distinct modes, following the MindNode/Excel paradigm:
 | Node selected | Navigate down | ↓ | Move to next visually-below node (can cross parent and tree boundaries) |
 | Node selected | Navigate up | ↑ | Move to previous visually-above node (can cross parent and tree boundaries) |
 | Node selected | Enter edit mode | Enter | Cursor at end of node's text |
-| Node selected | Delete node | Backspace | Remove node and entire subtree; select parent if it exists, otherwise nearest remaining root by position; nothing selected if canvas becomes empty |
+| Node selected | Delete node | Backspace | Remove node and entire subtree; select nearest sibling (previous, or next if first), then parent if no siblings, then nearest remaining root by position if root was deleted; nothing selected if canvas becomes empty |
 | Node selected | Collapse/expand | Space | Toggle selected node's collapsed state |
 | Node selected | Move node up | ⌘+↑ | Reorder among siblings |
 | Node selected | Move node down | ⌘+↓ | Reorder among siblings |
@@ -431,20 +435,22 @@ The app has two distinct modes, following the MindNode/Excel paradigm:
 
 Arrow keys navigate spatially based on screen position, not tree structure. The direction of Left/Right flips depending on which side of its parent a node is on:
 
-- **Right-side branches** (child.x > parent.x): Left moves toward parent, Right moves toward first child.
-- **Left-side branches** (child.x < parent.x): Right moves toward parent, Left moves toward first child.
+- **Right-side branches** (child.x > parent.x): Left moves toward parent, Right moves toward first child (expands if collapsed).
+- **Left-side branches** (child.x < parent.x): Right moves toward parent, Left moves toward first child (expands if collapsed).
 - **At a root node**: Left goes to first left-side child (if any), Right goes to first right-side child (if any).
-- **Up/Down**: Move to the nearest visible node above/below the current node by y position. Can cross parent boundaries and tree boundaries.
+- **Up/Down**: Move to the nearest visible node above/below the current node by y position. Can cross parent boundaries and tree boundaries. No-op at the topmost/bottommost visible node.
 
-Direction of a branch is inferred from stored positions: if a child's x coordinate is less than its parent's x, it is a left-side branch.
+Direction of a branch is inferred from stored positions: if a child's x coordinate is less than its parent's x, it is a left-side branch. All navigation directions are no-ops when there is no node to move to (e.g., Left/Right at a leaf or childless side of a root).
 
 ### Layout direction
 
 The default direction for new children is rightward from their parent. If a user drags a first-level child of a root to the left side of that root, its descendants will extend further leftward. The direction is inferred from positions, not stored explicitly.
 
-### Auto-reflow
+### Layout modes
 
-When nodes are added or removed, the layout engine reflows sibling positions to maintain even spacing. Each root tree is laid out independently. Trees do not auto-reflow based on other trees' positions.
+**Full layout (dagre):** Used when creating a brand-new tree or when the user explicitly requests reflow (future command). Dagre computes positions for all nodes in the tree from scratch.
+
+**Incremental layout:** Used for all structural mutations (add child, add sibling, delete, collapse, expand). Instead of re-running dagre, the engine shifts affected siblings and their entire subtrees to make or close vertical space. This preserves any manual positioning the user has done. Each root tree is adjusted independently. If a shifted subtree overlaps a different root tree, the overlapping tree is pushed apart as well.
 
 ### Viewport following
 
@@ -562,7 +568,7 @@ Chunks 2 and 3 can be developed in parallel (they share types but are otherwise 
 
 | Chunk | Scope | Deliverables | Tests |
 |-------|-------|-------------|-------|
-| **5. Layout engine** | @dagrejs/dagre integration; compute initial positions; auto-reflow on add/remove; bidirectional layout (right-side LR, left-side RL); handle collapsed subtrees; independent layout per root tree | `core/src/layout/` | Position snapshot tests; collapsed subtree exclusion tests; bidirectional layout tests |
+| **5. Layout engine** | @dagrejs/dagre integration for full layout of new trees; incremental sibling-shift layout for add/remove/collapse/expand (preserves manual positions); bidirectional layout (right-side LR, left-side RL via separate dagre runs); handle collapsed subtrees; independent layout per root tree; cross-tree overlap detection | `core/src/layout/` | Position snapshot tests; collapsed subtree exclusion tests; bidirectional layout tests; incremental layout preserves manual positions; cross-tree overlap push tests |
 | **6. SVG renderer** | React components for nodes, edges, labels; custom pan/zoom viewport; render from Editor state | `web/src/components/` | Playwright visual regression screenshots |
 | **7. Node styling** | Colors, shape variants, collapse indicators, selected/focused states; CSS | `web/src/components/` | Playwright screenshot comparisons |
 

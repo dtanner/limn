@@ -113,5 +113,5 @@
 | 2026-02-25 | Multiple roots (forest) over single root | More flexible canvas; roots can be created/deleted freely; empty canvas valid |
 | 2026-02-25 | Spatial arrow navigation over structural | Left/Right follow screen direction, not parent/child; matches MindNode; intuitive for bidirectional layout |
 | 2026-02-25 | Enter=edit mode, not create sibling | In nav mode Enter edits; in edit mode Enter creates sibling; two keystrokes for sibling from nav is acceptable |
-| 2026-02-25 | Auto-reflow siblings on add/remove | Keeps layout clean; each root tree reflows independently |
+| 2026-02-25 | Incremental layout over full dagre reflow | Dagre for new trees only; add/remove/collapse shifts siblings and subtrees; preserves manual positions; cross-tree overlap detection pushes trees apart |
 | 2026-02-25 | Direction inferred from positions | No explicit side property; child.x < parent.x means left-side branch; simpler data model |
