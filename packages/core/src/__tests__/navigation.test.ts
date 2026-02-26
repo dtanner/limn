@@ -341,6 +341,38 @@ describe("Spatial navigation", () => {
     });
   });
 
+  describe("nothing selected + arrow keys", () => {
+    test("arrow key with nothing selected selects nearest node to viewport center", () => {
+      editor = new TestEditor();
+      editor.loadJSON(rootWithThreeChildren());
+      // Camera at (400, 300) with zoom 1 means viewport center is at world (400-400, 300-300) = (0,0) ... no
+      // Actually viewport center in world coords: (vpW/2 - cam.x) / cam.zoom
+      // Set camera so viewport center is near root (0,0)
+      editor.setCamera(400, 300, 1);
+      editor.setViewportSize(800, 600);
+      editor.deselect();
+      expect(editor.getSelectedId()).toBeNull();
+
+      editor.pressKey("ArrowDown");
+      // Should select the node nearest to viewport center (world 0, 0) = root at (0,0)
+      expect(editor.getSelectedId()).not.toBeNull();
+    });
+
+    test("selects node closest to viewport center", () => {
+      editor = new TestEditor();
+      editor.loadJSON(rootWithThreeChildren());
+      // Camera positioned so viewport center is near c3 at (250, 52)
+      // World center = (vpW/2 - camX) / zoom, (vpH/2 - camY) / zoom
+      // Want world center at (250, 52): camX = vpW/2 - 250, camY = vpH/2 - 52
+      editor.setViewportSize(800, 600);
+      editor.setCamera(800 / 2 - 250, 600 / 2 - 52, 1);
+      editor.deselect();
+
+      editor.pressKey("ArrowUp"); // any arrow key should select nearest
+      expect(editor.getSelectedId()).toBe("c3");
+    });
+  });
+
   describe("keyboard dispatch for arrow keys", () => {
     beforeEach(() => {
       editor = new TestEditor();

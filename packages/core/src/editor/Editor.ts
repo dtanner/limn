@@ -423,7 +423,7 @@ export class Editor {
   // --- Spatial navigation ---
 
   navigateUp(): void {
-    if (this.selectedId === null) return;
+    if (this.selectedId === null) { this.selectNearestToViewportCenter(); return; }
     const current = this.store.getNode(this.selectedId);
     const currentCenterY = current.y + current.height / 2;
     const visible = this.store.getVisibleNodes();
@@ -448,7 +448,7 @@ export class Editor {
   }
 
   navigateDown(): void {
-    if (this.selectedId === null) return;
+    if (this.selectedId === null) { this.selectNearestToViewportCenter(); return; }
     const current = this.store.getNode(this.selectedId);
     const currentCenterY = current.y + current.height / 2;
     const visible = this.store.getVisibleNodes();
@@ -473,7 +473,7 @@ export class Editor {
   }
 
   navigateLeft(): void {
-    if (this.selectedId === null) return;
+    if (this.selectedId === null) { this.selectNearestToViewportCenter(); return; }
     const current = this.store.getNode(this.selectedId);
 
     if (current.parentId === null) {
@@ -510,7 +510,7 @@ export class Editor {
   }
 
   navigateRight(): void {
-    if (this.selectedId === null) return;
+    if (this.selectedId === null) { this.selectNearestToViewportCenter(); return; }
     const current = this.store.getNode(this.selectedId);
 
     if (current.parentId === null) {
@@ -772,6 +772,33 @@ export class Editor {
       }
     }
     this.editing = false;
+  }
+
+  /** Select the visible node closest to the center of the viewport. */
+  private selectNearestToViewportCenter(): void {
+    const visible = this.store.getVisibleNodes();
+    if (visible.length === 0) return;
+
+    // Viewport center in world coordinates
+    const worldCenterX = (this.viewportWidth / 2 - this.camera.x) / this.camera.zoom;
+    const worldCenterY = (this.viewportHeight / 2 - this.camera.y) / this.camera.zoom;
+
+    let best: string | null = null;
+    let bestDist = Infinity;
+    for (const node of visible) {
+      const nodeCenterX = node.x + node.width / 2;
+      const nodeCenterY = node.y + node.height / 2;
+      const dist = Math.hypot(nodeCenterX - worldCenterX, nodeCenterY - worldCenterY);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = node.id;
+      }
+    }
+
+    if (best) {
+      this.selectedId = best;
+      this.notify();
+    }
   }
 
   /** Update a node's dimensions using the text measurer. */
