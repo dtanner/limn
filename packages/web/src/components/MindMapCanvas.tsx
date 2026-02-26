@@ -19,6 +19,7 @@ export function MindMapCanvas() {
   const camera = editor.getCamera();
   const visibleNodes = editor.getVisibleNodes();
   const selectedId = editor.getSelectedId();
+  const rootIds = new Set(editor.getRoots().map((r) => r.id));
 
   // Collect all parent-child edges for visible nodes
   const edges: { parent: MindMapNode; child: MindMapNode }[] = [];
@@ -134,7 +135,7 @@ export function MindMapCanvas() {
             onClick={() => handleNodeClick(node.id)}
             style={{ cursor: "pointer" }}
           >
-            <NodeView node={node} isSelected={node.id === selectedId} />
+            <NodeView node={node} isSelected={node.id === selectedId} isRoot={rootIds.has(node.id)} />
           </g>
         ))}
       </g>

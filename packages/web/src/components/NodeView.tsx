@@ -1,10 +1,10 @@
 // ABOUTME: SVG component rendering a single mind map node.
-// ABOUTME: Displays a rounded rectangle with text content.
+// ABOUTME: Displays a rounded rectangle with text, selection highlight, and collapse indicator.
 
 import type { MindMapNode } from "@mindforge/core";
 
 const BORDER_RADIUS = 6;
-const PADDING_X = 8;
+const PADDING_X = 10;
 const PADDING_Y = 6;
 const FONT_SIZE = 14;
 const LINE_HEIGHT = 20;
@@ -12,36 +12,61 @@ const LINE_HEIGHT = 20;
 interface NodeViewProps {
   node: MindMapNode;
   isSelected: boolean;
+  isRoot: boolean;
 }
 
-export function NodeView({ node, isSelected }: NodeViewProps) {
+export function NodeView({ node, isSelected, isRoot }: NodeViewProps) {
   const lines = node.text.split("\n");
+
+  const fillColor = isSelected ? "#dbeafe" : "#ffffff";
+  const strokeColor = isSelected ? "#3b82f6" : "#d1d5db";
+  const strokeWidth = isSelected ? 2 : 1;
+  const fontWeight = isRoot ? 600 : 400;
 
   return (
     <g transform={`translate(${node.x}, ${node.y})`}>
+      {/* Drop shadow */}
       <rect
         width={node.width}
         height={node.height}
         rx={BORDER_RADIUS}
         ry={BORDER_RADIUS}
-        fill={isSelected ? "#e0edff" : "#ffffff"}
-        stroke={isSelected ? "#3b82f6" : "#d1d5db"}
-        strokeWidth={isSelected ? 2 : 1}
+        fill="rgba(0,0,0,0.06)"
+        transform="translate(1, 2)"
       />
+      {/* Main rectangle */}
+      <rect
+        width={node.width}
+        height={node.height}
+        rx={BORDER_RADIUS}
+        ry={BORDER_RADIUS}
+        fill={fillColor}
+        stroke={strokeColor}
+        strokeWidth={strokeWidth}
+      />
+      {/* Collapse indicator: small circle with child count */}
       {node.collapsed && node.children.length > 0 && (
-        <circle
-          cx={node.width + 6}
-          cy={node.height / 2}
-          r={4}
-          fill="#9ca3af"
-        />
+        <g transform={`translate(${node.width + 8}, ${node.height / 2})`}>
+          <circle r={8} fill="#e5e7eb" stroke="#9ca3af" strokeWidth={1} />
+          <text
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={10}
+            fontFamily="system-ui, -apple-system, sans-serif"
+            fill="#6b7280"
+          >
+            {node.children.length}
+          </text>
+        </g>
       )}
+      {/* Text lines */}
       {lines.map((line, i) => (
         <text
           key={i}
           x={PADDING_X}
           y={PADDING_Y + FONT_SIZE + i * LINE_HEIGHT}
           fontSize={FONT_SIZE}
+          fontWeight={fontWeight}
           fontFamily="system-ui, -apple-system, sans-serif"
           fill="#1f2937"
         >

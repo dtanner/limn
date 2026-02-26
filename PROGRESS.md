@@ -2,8 +2,8 @@
 
 ## Current status
 
-**Phase**: Phase 2 -- Visual Shell
-**Next chunk**: Chunk 7 (Node styling)
+**Phase**: Phase 3 -- Interaction
+**Next chunk**: Chunk 8 (Keyboard navigation)
 **Last updated**: 2026-02-26
 
 ---
@@ -162,8 +162,29 @@
 - Pan: scroll wheel or pointer drag on canvas background
 - Zoom: Cmd/Ctrl + scroll wheel, zooms toward cursor position
 
-### Up next: Chunk 7
-- Node styling, colors, collapse indicators, selected/focused states
+### Chunk 7: Node styling (2026-02-26)
+
+**What was done:**
+- Global CSS reset (box-sizing, margin/padding, full-viewport layout)
+- Drop shadows on nodes via offset rect
+- Root nodes rendered with bold (fontWeight 600) text
+- Improved collapse indicator: circle with child count number
+- Better selection highlight (light blue fill #dbeafe, blue border)
+- Better text padding and alignment
+- CSS imported via main.tsx
+
+**Files changed:**
+- `packages/web/src/index.css` -- global styles
+- `packages/web/src/main.tsx` -- imports CSS
+- `packages/web/src/components/NodeView.tsx` -- improved styling with shadow, root bold, collapse count
+- `packages/web/src/components/MindMapCanvas.tsx` -- passes isRoot prop to NodeView
+
+**Tests added:**
+- Visual verification via dev server
+
+### Up next: Chunk 8
+- DOM keyboard event handler wiring to core dispatch
+- Spatial arrow key navigation (up/down/left/right)
 
 ---
 
