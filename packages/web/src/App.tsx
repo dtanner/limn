@@ -8,6 +8,7 @@ import { EditorContext } from "./hooks/useEditor";
 import { AssetUrlContext, type AssetUrlMap } from "./hooks/useAssetUrls";
 import { MindMapCanvas } from "./components/MindMapCanvas";
 import { useKeyboardHandler } from "./input/useKeyboardHandler";
+import { setupAutoSave, loadFromIDB } from "./persistence/local";
 
 const DEMO_MAP: MindMapFileFormat = {
   version: 1,
@@ -61,12 +62,27 @@ const DEMO_MAP: MindMapFileFormat = {
   assets: [],
 };
 
+const DOC_ID = "demo";
+
 export function App() {
-  const editor = useMemo(() => {
-    const e = new Editor();
-    e.loadJSON(DEMO_MAP);
-    return e;
-  }, []);
+  const editor = useMemo(() => new Editor(), []);
+  const [loaded, setLoaded] = useState(false);
+
+  // Load from IndexedDB or fall back to demo map
+  useEffect(() => {
+    loadFromIDB(DOC_ID).then((saved) => {
+      editor.loadJSON(saved ?? DEMO_MAP);
+      setLoaded(true);
+    });
+  }, [editor]);
+
+  // Set up auto-save after initial load
+  useEffect(() => {
+    if (!loaded) return;
+    return setupAutoSave(editor, DOC_ID, (data) => {
+      editor.loadJSON(data);
+    });
+  }, [editor, loaded]);
 
   useKeyboardHandler(editor);
 
@@ -139,6 +155,10 @@ export function App() {
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
   }, [editor]);
+
+  if (!loaded) {
+    return <div style={{ width: "100vw", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#6b7280" }}>Loading...</div>;
+  }
 
   return (
     <EditorContext.Provider value={editor}>

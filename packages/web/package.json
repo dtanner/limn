@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@mindforge/core": "workspace:*",
+    "idb-keyval": "^6.2.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

@@ -26,6 +26,8 @@ bun run dev          # Vite dev server
 bun run build        # Production build
 ```
 
+- Use `bunx` instead of `npx` for running package binaries (this is a Bun project).
+
 ## Architecture invariants
 
 - **Editor is the sole source of truth.** All mutations go through Editor methods. DOM renders from Editor state, never writes to it.

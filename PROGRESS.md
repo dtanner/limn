@@ -3,7 +3,7 @@
 ## Current status
 
 **Phase**: Phase 3 -- Interaction
-**Next chunk**: Chunk 12 (IndexedDB auto-save)
+**Next chunk**: Chunk 13 (File save/load)
 **Last updated**: 2026-02-26
 
 ---
@@ -271,8 +271,27 @@
 **Tests added:**
 - 8 image tests: attach image, register asset, no duplicate assets, remove image, undo set, undo remove, round-trip serialization, replace image
 
-### Up next: Chunk 12
-- IndexedDB auto-save (debounced save, load on startup)
+### Chunk 12: IndexedDB auto-save (2026-02-26)
+
+**What was done:**
+- idb-keyval integration for IndexedDB persistence
+- Debounced auto-save (500ms after each editor state change)
+- Load from IndexedDB on startup, fall back to demo map on first visit
+- BroadcastChannel for cross-tab sync (revision counter, reload on remote update)
+- Loading state while async IDB read completes
+- bunx over npx preference documented in CLAUDE.md
+
+**Files changed:**
+- `packages/web/src/persistence/local.ts` -- loadFromIDB, setupAutoSave, cross-tab sync
+- `packages/web/src/App.tsx` -- integrated auto-save, async load, loading state
+- `packages/web/package.json` -- added idb-keyval dependency
+- `CLAUDE.md` -- documented bunx preference
+
+**Tests added:**
+- Visual verification via dev server (IndexedDB is a browser API; persistence logic tested by editing, reloading, and confirming data persists)
+
+### Up next: Chunk 13
+- File save/load (browser-fs-access, Cmd+S, file open)
 
 ---
 
