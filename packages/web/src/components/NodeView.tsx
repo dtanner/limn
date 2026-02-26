@@ -106,6 +106,18 @@ export function NodeView({ node, isSelected, isRoot, isReparentTarget, imageUrl 
           {line || "\u00A0"}
         </text>
       ))}
+      {/* Right edge resize handle (visible on selected) */}
+      {isSelected && (
+        <rect
+          data-resize-handle
+          x={node.width - 4}
+          y={0}
+          width={8}
+          height={node.height}
+          fill="transparent"
+          style={{ cursor: "ew-resize" }}
+        />
+      )}
     </g>
   );
 }

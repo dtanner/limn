@@ -57,6 +57,12 @@ export class Editor {
   private dragMoved = false;
   private reparentTargetId: string | null = null;
 
+  // Width resize state
+  private resizingWidth = false;
+  private resizeNodeId: string | null = null;
+  private resizeStartWidth = 0;
+  private resizeChanged = false;
+
   // Viewport dimensions (set by web layer for zoom-to-fit)
   private viewportWidth = 0;
   private viewportHeight = 0;
@@ -653,6 +659,46 @@ export class Editor {
     }
 
     return bestId;
+  }
+
+  // --- Width resize ---
+
+  private static MIN_NODE_WIDTH = 60;
+
+  isResizingWidth(): boolean {
+    return this.resizingWidth;
+  }
+
+  startWidthResize(nodeId: string): void {
+    this.pushUndo("resize-width");
+    const node = this.store.getNode(nodeId);
+    this.resizingWidth = true;
+    this.resizeNodeId = nodeId;
+    this.resizeStartWidth = node.width;
+    this.resizeChanged = false;
+    this.notify();
+  }
+
+  updateWidthResize(newWidth: number): void {
+    if (!this.resizingWidth || this.resizeNodeId === null) return;
+    const clampedWidth = Math.max(Editor.MIN_NODE_WIDTH, newWidth);
+    this.store.setNodeWidth(this.resizeNodeId, clampedWidth);
+    this.remeasureNode(this.resizeNodeId);
+    this.resizeChanged = true;
+    this.notify();
+  }
+
+  endWidthResize(): void {
+    if (!this.resizingWidth) return;
+
+    if (!this.resizeChanged) {
+      // No-op resize: pop the undo entry
+      this.undoStack.pop();
+    }
+
+    this.resizingWidth = false;
+    this.resizeNodeId = null;
+    this.notify();
   }
 
   // --- Undo/redo ---

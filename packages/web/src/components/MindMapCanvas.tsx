@@ -25,6 +25,10 @@ export function MindMapCanvas() {
   const pointerStart = useRef({ x: 0, y: 0 });
   const isDraggingNode = useRef(false);
 
+  // Width resize state
+  const isResizingWidth = useRef(false);
+  const resizeNodeId = useRef<string | null>(null);
+
   const camera = editor.getCamera();
   const allVisibleNodes = editor.getVisibleNodes();
   const selectedId = editor.getSelectedId();
@@ -142,6 +146,19 @@ export function MindMapCanvas() {
       const target = e.target as SVGElement;
       const isCanvas = target.tagName === "svg" || target.classList.contains("canvas-bg");
 
+      // Check for resize handle
+      if (target.hasAttribute("data-resize-handle")) {
+        const nodeGroup = target.closest("[data-node-id]") as SVGElement | null;
+        const nodeId = nodeGroup?.getAttribute("data-node-id");
+        if (nodeId) {
+          isResizingWidth.current = true;
+          resizeNodeId.current = nodeId;
+          editor.startWidthResize(nodeId);
+          svgRef.current?.setPointerCapture(e.pointerId);
+          return;
+        }
+      }
+
       if (isCanvas) {
         // Canvas background: start panning
         isPanning.current = true;
@@ -158,11 +175,19 @@ export function MindMapCanvas() {
         }
       }
     },
-    [],
+    [editor],
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
+      if (isResizingWidth.current && resizeNodeId.current) {
+        const world = screenToWorld(e.clientX, e.clientY);
+        const node = editor.getNode(resizeNodeId.current);
+        const newWidth = world.x - node.x;
+        editor.updateWidthResize(newWidth);
+        return;
+      }
+
       if (isPanning.current) {
         const dx = e.clientX - lastPointer.current.x;
         const dy = e.clientY - lastPointer.current.y;
@@ -195,6 +220,13 @@ export function MindMapCanvas() {
 
   const handlePointerUp = useCallback(
     (_e: React.PointerEvent) => {
+      if (isResizingWidth.current) {
+        editor.endWidthResize();
+        isResizingWidth.current = false;
+        resizeNodeId.current = null;
+        return;
+      }
+
       if (isPanning.current) {
         isPanning.current = false;
         return;
