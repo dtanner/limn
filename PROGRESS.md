@@ -57,7 +57,7 @@
 **Goal:** Core types and tree operations, fully tested.
 
 **Acceptance criteria:**
-- [ ] MindMapNode (with x/y), MindMap (with roots[]), CrossLink, Asset types defined
+- [ ] MindMapNode (with x/y), MindMap (with roots[]), Asset types defined
 - [ ] Flat store (Map<string, MindMapNode>) with add root/add child/remove/reparent/reorder
 - [ ] Tree traversal utilities (getChildren, getParent, getSiblings, getRoots, getAncestors)
 - [ ] All operations maintain tree invariants (no orphans, no cycles, valid roots[])

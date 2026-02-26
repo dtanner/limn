@@ -155,7 +155,7 @@ interface NodeStyle {
 
 interface Asset {
   id: string;
-  filename: string;        // Relative path in sidecar directory
+  filename: string;        // Bare filename within the sidecar directory (e.g., "arch-diagram.png")
   mimeType: string;
   width: number;           // Original dimensions
   height: number;
@@ -249,7 +249,7 @@ On disk, the flat map serializes as a nested tree for readability and clean diff
     }
   ],
   "assets": [
-    { "id": "a1", "filename": "assets/arch-diagram.png", "mimeType": "image/png", "width": 1200, "height": 900 }
+    { "id": "a1", "filename": "arch-diagram.png", "mimeType": "image/png", "width": 1200, "height": 900 }
   ]
 }
 ```
