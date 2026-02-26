@@ -2,9 +2,10 @@
 
 ## Current status
 
-**Phase**: Phase 3 -- Interaction
+**Phase**: Phase 4 -- Persistence
 **Next chunk**: Chunk 13 (File save/load)
 **Last updated**: 2026-02-26
+**Tests**: 169 passing, lint clean
 
 ---
 
@@ -290,8 +291,50 @@
 **Tests added:**
 - Visual verification via dev server (IndexedDB is a browser API; persistence logic tested by editing, reloading, and confirming data persists)
 
-### Up next: Chunk 13
-- File save/load (browser-fs-access, Cmd+S, file open)
+---
+
+## Remaining work
+
+Reference: SPEC.md chunks 14-18. Each entry includes the spec's scope description.
+
+### Chunk 13: File save/load
+- browser-fs-access integration for Cmd+S save and file open workflows
+- `showSaveFilePicker()` on Chromium, `<a download>` fallback on Safari/Firefox
+- Zip fallback for maps with images on non-Chromium browsers
+- File format versioning and forward migrations
+- Deliverable: `web/src/persistence/file.ts`
+- Tests: integration tests, Playwright file dialog tests
+
+### Chunk 14: Service worker
+- Workbox setup for offline caching of app shell
+- Update notification banner when new version available
+- Deliverable: `web/src/service-worker/`
+- Tests: Playwright offline simulation tests
+
+### Chunk 15: Export
+- SVG export (serialize rendered SVG element)
+- PNG export (SVG to Canvas to toDataURL)
+- Markdown export (already implemented in core, needs UI trigger)
+- URL sharing via lz-string compressed JSON in URL hash
+- Deliverable: `web/src/export/`
+- Tests: snapshot tests for SVG/markdown output, URL round-trip tests
+
+### Chunk 16: Animations
+- Smooth layout transitions on add/remove/collapse/expand
+- Spring physics or CSS transitions
+- Tests: visual regression tests
+
+### Chunk 17: Performance and accessibility
+- Viewport culling for large maps (only render visible nodes)
+- Screen reader audit (ARIA roles, labels)
+- Keyboard focus indicators
+- Performance benchmarks at 500 and 1000 nodes
+- Tests: performance benchmarks, axe-core audit
+
+### Gaps in completed chunks (not blocking, but noted)
+- Image resize handles (spec: dot in upper-right corner for proportional resize)
+- Drag right edge of node to resize width (spec: widthConstrained mode)
+- Animated transitions for collapse/expand (currently instant)
 
 ---
 
