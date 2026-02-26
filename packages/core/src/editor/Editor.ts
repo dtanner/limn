@@ -322,6 +322,7 @@ export class Editor {
     const id = this.store.addRoot(text, x, y);
     this.selectedId = id;
     this.editing = true;
+    this.ensureNodeVisible(id);
     this.notify();
     return id;
   }
@@ -333,6 +334,7 @@ export class Editor {
     this.resolveOverlapForNode(id);
     this.selectedId = id;
     this.editing = true;
+    this.ensureNodeVisible(id);
     this.notify();
     return id;
   }
@@ -349,6 +351,7 @@ export class Editor {
     this.resolveOverlapForNode(id);
     this.selectedId = id;
     this.editing = true;
+    this.ensureNodeVisible(id);
     this.notify();
     return id;
   }
@@ -772,6 +775,44 @@ export class Editor {
       }
     }
     this.editing = false;
+  }
+
+  /** Pan the camera minimally to bring a node fully on-screen. */
+  private ensureNodeVisible(nodeId: string): void {
+    if (this.viewportWidth === 0 || this.viewportHeight === 0) return;
+
+    const node = this.store.getNode(nodeId);
+    const padding = 40;
+    const zoom = this.camera.zoom;
+
+    // Node bounding box in screen coordinates
+    const screenLeft = node.x * zoom + this.camera.x;
+    const screenTop = node.y * zoom + this.camera.y;
+    const screenRight = screenLeft + node.width * zoom;
+    const screenBottom = screenTop + node.height * zoom;
+
+    let dx = 0;
+    let dy = 0;
+
+    if (screenRight > this.viewportWidth - padding) {
+      dx = (this.viewportWidth - padding) - screenRight;
+    } else if (screenLeft < padding) {
+      dx = padding - screenLeft;
+    }
+
+    if (screenBottom > this.viewportHeight - padding) {
+      dy = (this.viewportHeight - padding) - screenBottom;
+    } else if (screenTop < padding) {
+      dy = padding - screenTop;
+    }
+
+    if (dx !== 0 || dy !== 0) {
+      this.camera = {
+        x: this.camera.x + dx,
+        y: this.camera.y + dy,
+        zoom: this.camera.zoom,
+      };
+    }
   }
 
   /** Select the visible node closest to the center of the viewport. */

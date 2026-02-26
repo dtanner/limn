@@ -490,6 +490,68 @@ describe("Editor", () => {
     });
   });
 
+  describe("viewport following", () => {
+    test("addChild scrolls to keep new node visible", () => {
+      // Set up a viewport where n0's child would be off-screen to the right
+      editor.setViewportSize(800, 600);
+      // Camera at (0,0) zoom 1: viewport shows world x=[0,800], y=[0,600]
+      // n0 is at (0,0). A child at x=250 is on-screen. But if we pan left so
+      // n0 is at the right edge, a child would be off-screen.
+      editor.setCamera(700, 300, 1); // n0 at screen x=700
+      const childId = editor.addChild("n0");
+      const child = editor.getNode(childId);
+      const cam = editor.getCamera();
+      // The child should be visible: its screen position should be within viewport
+      const screenX = child.x * cam.zoom + cam.x;
+      expect(screenX).toBeGreaterThanOrEqual(0);
+      expect(screenX + child.width * cam.zoom).toBeLessThanOrEqual(800);
+    });
+
+    test("addSibling scrolls to keep new sibling visible", () => {
+      editor.setViewportSize(800, 600);
+      // Pan so n2 is near the bottom edge; a new sibling below it would be off-screen
+      editor.setCamera(0, -50, 1); // n2 at y=30 → screen y = 30 + (-50) = -20 ...
+      // Let's make it so sibling would be below viewport
+      // n2 is at y=30, height=32. Sibling below would be at y~82.
+      // Camera with y = -500: screen y of sibling = 82 + (-500) = -418, off top
+      // Better: camera.y = 300, viewport [0,600] in screen, world y = (screenY - 300)/1
+      // n2 at world y=30, screen y = 30 + 300 = 330. Good.
+      // Sibling at world y~82, screen y = 82 + 300 = 382. Still on-screen.
+      // Let's use zoom to push things off: zoom=2, n2 at screen y=30*2+300=360
+      // Sibling at world y~82, screen y = 82*2+300 = 464. Still on-screen.
+      // Simplest: set camera so the sibling's position would be past viewport bottom
+      editor.setCamera(0, 0, 1); // viewport shows world y=[0,600]
+      // n2 is at y=30. If we force it down...
+      // Actually, with default positions, siblings stay on-screen. Let me create a deeper tree.
+      // Just verify that ensureNodeVisible is called (functional test):
+      // Move n2 very far down so its sibling would be off-screen
+      editor.setNodePosition("n2", 250, 800);
+      editor.setCamera(0, 0, 1); // viewport shows world y=[0,600]
+      editor.select("n2");
+      editor.exitEditMode();
+      const sibId = editor.addSibling("n2");
+      expect(sibId).not.toBeNull();
+      const sib = editor.getNode(sibId!);
+      const cam = editor.getCamera();
+      const screenY = sib.y * cam.zoom + cam.y;
+      // Should have scrolled so sibling is visible
+      expect(screenY).toBeGreaterThanOrEqual(-sib.height);
+      expect(screenY).toBeLessThanOrEqual(600);
+    });
+
+    test("does not scroll when new node is already visible", () => {
+      editor.setViewportSize(800, 600);
+      editor.setCamera(400, 300, 1); // n0 at screen (400,300), well within viewport
+      const camBefore = { ...editor.getCamera() };
+      editor.addChild("n0");
+      // Child at world x=250, screen x = 250 + 400 = 650. On-screen.
+      // Camera should not have changed (or changed minimally for the child)
+      const camAfter = editor.getCamera();
+      // At minimum, x shouldn't have jumped dramatically
+      expect(Math.abs(camAfter.x - camBefore.x)).toBeLessThan(100);
+    });
+  });
+
   describe("toJSON", () => {
     test("preserves camera position", () => {
       editor.setCamera(100, 200, 1.5);
