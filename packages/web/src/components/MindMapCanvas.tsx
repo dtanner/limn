@@ -9,6 +9,7 @@ import { NodeView } from "./NodeView";
 import { EdgeView } from "./EdgeView";
 import { TextEditor } from "./TextEditor";
 import { ReparentIndicator } from "./ReparentIndicator";
+import { saveAssetBlob } from "../persistence/local";
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 3;
@@ -367,7 +368,8 @@ export function MindMapCanvas() {
             editor.setNodeImage(rootId, asset, displayWidth, displayHeight);
           }
 
-          // Dispatch custom event so App can register the blob URL
+          // Persist blob to IndexedDB and notify App of the blob URL
+          saveAssetBlob(assetId, imageFile);
           window.dispatchEvent(new CustomEvent("mindforge:asset-added", {
             detail: { assetId, blobUrl },
           }));

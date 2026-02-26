@@ -8,6 +8,7 @@ import type { MindMapFileFormat } from "@mindforge/core";
 const SAVE_DEBOUNCE_MS = 500;
 const IDB_PREFIX = "mindforge:doc:";
 const IDB_REVISION_PREFIX = "mindforge:rev:";
+const IDB_ASSET_PREFIX = "mindforge:asset:";
 const BROADCAST_CHANNEL_NAME = "mindforge-sync";
 
 interface StoredDocument {
@@ -84,4 +85,28 @@ export function setupAutoSave(
     }
     channel?.close();
   };
+}
+
+/** Store an image blob in IndexedDB. */
+export async function saveAssetBlob(assetId: string, blob: Blob): Promise<void> {
+  await set(IDB_ASSET_PREFIX + assetId, blob);
+}
+
+/** Retrieve an image blob from IndexedDB. */
+export async function loadAssetBlob(assetId: string): Promise<Blob | undefined> {
+  return get<Blob>(IDB_ASSET_PREFIX + assetId);
+}
+
+/** Load blobs for a list of asset IDs and return a map of assetId -> blob URL. */
+export async function loadAllAssetBlobs(assetIds: string[]): Promise<Map<string, string>> {
+  const urlMap = new Map<string, string>();
+  await Promise.all(
+    assetIds.map(async (id) => {
+      const blob = await loadAssetBlob(id);
+      if (blob) {
+        urlMap.set(id, URL.createObjectURL(blob));
+      }
+    }),
+  );
+  return urlMap;
 }

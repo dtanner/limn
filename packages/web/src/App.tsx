@@ -9,7 +9,7 @@ import { AssetUrlContext, type AssetUrlMap } from "./hooks/useAssetUrls";
 import { MindMapCanvas } from "./components/MindMapCanvas";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { useKeyboardHandler } from "./input/useKeyboardHandler";
-import { setupAutoSave, loadFromIDB } from "./persistence/local";
+import { setupAutoSave, loadFromIDB, saveAssetBlob, loadAllAssetBlobs } from "./persistence/local";
 import { saveToFile, openFile } from "./persistence/file";
 import { exportSvg } from "./export/svg";
 import { decompressFromUrl } from "@mindforge/core";
@@ -86,8 +86,16 @@ export function App() {
       }
     }
 
-    loadFromIDB(DOC_ID).then((saved) => {
+    loadFromIDB(DOC_ID).then(async (saved) => {
       editor.loadJSON(saved ?? DEMO_MAP);
+      // Restore image blob URLs from IndexedDB
+      const assets = editor.getAssets();
+      if (assets.length > 0) {
+        const urls = await loadAllAssetBlobs(assets.map((a) => a.id));
+        if (urls.size > 0) {
+          setAssetUrls(urls);
+        }
+      }
       setLoaded(true);
     });
   }, [editor]);
@@ -180,6 +188,7 @@ export function App() {
               next.set(assetId, blobUrl);
               return next;
             });
+            saveAssetBlob(assetId, file);
           };
           img.src = blobUrl;
           break;
