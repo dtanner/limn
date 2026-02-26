@@ -64,9 +64,6 @@ export class Editor {
   // Document metadata
   protected meta: MindMapMeta = { id: "default", version: 1, theme: "default" };
 
-  // Asset registry (document state)
-  private assets: Asset[] = [];
-
   // External action callbacks (set by web layer)
   private saveCallback: (() => void) | null = null;
   private openCallback: (() => void) | null = null;
@@ -402,24 +399,18 @@ export class Editor {
   // --- Image/asset management ---
 
   getAssets(): Asset[] {
-    return this.assets;
+    return this.store.getAssets();
   }
 
   setNodeImage(nodeId: string, asset: Asset, displayWidth: number, displayHeight: number): void {
     this.pushUndo("set-image");
-    const node = this.store.getNode(nodeId);
-    node.image = { assetId: asset.id, width: displayWidth, height: displayHeight };
-    // Register asset if not already present
-    if (!this.assets.some((a) => a.id === asset.id)) {
-      this.assets.push({ ...asset });
-    }
+    this.store.setNodeImage(nodeId, asset, displayWidth, displayHeight);
     this.notify();
   }
 
   removeNodeImage(nodeId: string): void {
     this.pushUndo("remove-image");
-    const node = this.store.getNode(nodeId);
-    delete node.image;
+    this.store.removeNodeImage(nodeId);
     this.notify();
   }
 
@@ -688,9 +679,9 @@ export class Editor {
 
   loadJSON(data: MindMapFileFormat): void {
     this.store = deserialize(data);
+    this.store.setAssets((data.assets ?? []).map((a) => ({ ...a })));
     this.meta = { ...data.meta, version: data.version };
     this.camera = data.camera ?? { x: 0, y: 0, zoom: 1 };
-    this.assets = (data.assets ?? []).map((a) => ({ ...a }));
     this.selectedId = null;
     this.editing = false;
     this.undoStack = [];
@@ -701,7 +692,7 @@ export class Editor {
 
   toJSON(): MindMapFileFormat {
     const data = serialize(this.store, this.meta, this.camera);
-    data.assets = this.assets.map((a) => ({ ...a }));
+    data.assets = this.store.getAssets().map((a) => ({ ...a }));
     return data;
   }
 
@@ -722,7 +713,7 @@ export class Editor {
       label,
       nodes,
       rootIds: [...this.store.getRoots().map((n) => n.id)],
-      assets: this.assets.map((a) => ({ ...a })),
+      assets: this.store.getAssets().map((a) => ({ ...a })),
     };
   }
 
@@ -735,7 +726,7 @@ export class Editor {
       newStore.addRootId(rootId);
     }
     this.store = newStore;
-    this.assets = entry.assets.map((a) => ({ ...a }));
+    this.store.setAssets(entry.assets.map((a) => ({ ...a })));
 
     // Fix selection if selected node no longer exists
     if (this.selectedId !== null && !entry.nodes.has(this.selectedId)) {

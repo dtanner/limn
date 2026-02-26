@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach } from "vitest";
 import { MindMapStore } from "../store/MindMapStore";
+import type { Asset } from "../model/types";
 
 describe("MindMapStore", () => {
   let store: MindMapStore;
@@ -380,6 +381,44 @@ describe("MindMapStore", () => {
     test("returns false for self", () => {
       const r = store.addRoot("Root");
       expect(store.isDescendant(r, r)).toBe(false);
+    });
+  });
+
+  describe("assets", () => {
+    const asset: Asset = {
+      id: "a1",
+      filename: "test.png",
+      mimeType: "image/png",
+      width: 800,
+      height: 600,
+    };
+
+    test("starts with no assets", () => {
+      expect(store.getAssets()).toEqual([]);
+    });
+
+    test("setNodeImage sets image ref and registers asset", () => {
+      const rootId = store.addRoot("Root");
+      store.setNodeImage(rootId, asset, 400, 300);
+      const node = store.getNode(rootId);
+      expect(node.image).toEqual({ assetId: "a1", width: 400, height: 300 });
+      expect(store.getAssets()).toHaveLength(1);
+      expect(store.getAssets()[0].id).toBe("a1");
+    });
+
+    test("does not duplicate assets", () => {
+      const r1 = store.addRoot("R1");
+      const r2 = store.addRoot("R2");
+      store.setNodeImage(r1, asset, 400, 300);
+      store.setNodeImage(r2, asset, 200, 150);
+      expect(store.getAssets()).toHaveLength(1);
+    });
+
+    test("removeNodeImage clears image from node", () => {
+      const rootId = store.addRoot("Root");
+      store.setNodeImage(rootId, asset, 400, 300);
+      store.removeNodeImage(rootId);
+      expect(store.getNode(rootId).image).toBeUndefined();
     });
   });
 });

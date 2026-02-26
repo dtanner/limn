@@ -1,7 +1,7 @@
 // ABOUTME: Flat map-based store for mind map nodes.
 // ABOUTME: Provides tree operations maintaining structural invariants.
 
-import type { MindMapNode } from "../model/types";
+import type { MindMapNode, Asset } from "../model/types";
 
 let nextIdCounter = 0;
 
@@ -20,6 +20,7 @@ const DEFAULT_HEIGHT = 32;
 export class MindMapStore {
   private nodes: Map<string, MindMapNode> = new Map();
   private rootIds: string[] = [];
+  private assets: Asset[] = [];
 
   get nodeCount(): number {
     return this.nodes.size;
@@ -246,6 +247,29 @@ export class MindMapStore {
     } else {
       newParent.children.push(nodeId);
     }
+  }
+
+  // --- Asset management ---
+
+  getAssets(): Asset[] {
+    return this.assets;
+  }
+
+  setAssets(assets: Asset[]): void {
+    this.assets = assets;
+  }
+
+  setNodeImage(nodeId: string, asset: Asset, displayWidth: number, displayHeight: number): void {
+    const node = this.getNode(nodeId);
+    node.image = { assetId: asset.id, width: displayWidth, height: displayHeight };
+    if (!this.assets.some((a) => a.id === asset.id)) {
+      this.assets.push({ ...asset });
+    }
+  }
+
+  removeNodeImage(nodeId: string): void {
+    const node = this.getNode(nodeId);
+    node.image = undefined;
   }
 
   reorderNode(nodeId: string, direction: "up" | "down"): void {
