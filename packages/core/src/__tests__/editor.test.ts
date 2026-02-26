@@ -582,6 +582,48 @@ describe("Editor", () => {
     });
   });
 
+  describe("detachToRoot", () => {
+    test("Shift+Tab on child detaches it to a root", () => {
+      editor.select("n1");
+      expect(editor.getNode("n1").parentId).toBe("n0");
+
+      editor.pressKey("Tab", { shift: true });
+
+      expect(editor.getNode("n1").parentId).toBeNull();
+      expect(editor.getRoots().map((r) => r.id)).toContain("n1");
+    });
+
+    test("Shift+Tab on root is a no-op", () => {
+      editor.select("n0");
+      const rootsBefore = editor.getRoots().length;
+
+      editor.pressKey("Tab", { shift: true });
+
+      expect(editor.getRoots().length).toBe(rootsBefore);
+      expect(editor.getNode("n0").parentId).toBeNull();
+    });
+
+    test("detachToRoot preserves children", () => {
+      editor.select("n1");
+      const childrenBefore = [...editor.getNode("n1").children];
+
+      editor.pressKey("Tab", { shift: true });
+
+      expect(editor.getNode("n1").children).toEqual(childrenBefore);
+    });
+
+    test("detachToRoot is undoable", () => {
+      editor.select("n1");
+      const parentBefore = editor.getNode("n1").parentId;
+
+      editor.pressKey("Tab", { shift: true });
+      expect(editor.getNode("n1").parentId).toBeNull();
+
+      editor.undo();
+      expect(editor.getNode("n1").parentId).toBe(parentBefore);
+    });
+  });
+
   describe("toJSON", () => {
     test("preserves camera position", () => {
       editor.setCamera(100, 200, 1.5);

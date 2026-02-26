@@ -249,6 +249,16 @@ export class MindMapStore {
     }
   }
 
+  detachToRoot(nodeId: string): void {
+    const node = this.getNode(nodeId);
+    if (node.parentId === null) return; // Already a root
+
+    const oldParent = this.getNode(node.parentId);
+    oldParent.children = oldParent.children.filter((id) => id !== nodeId);
+    node.parentId = null;
+    this.rootIds.push(nodeId);
+  }
+
   // --- Asset management ---
 
   getAssets(): Asset[] {

@@ -34,6 +34,15 @@ const bindings: KeyBinding[] = [
   // --- Nav mode ---
   {
     key: "Tab",
+    modifiers: { shift: true },
+    mode: "nav",
+    action: (editor) => {
+      const sel = editor.getSelectedId();
+      if (sel) editor.detachToRoot(sel);
+    },
+  },
+  {
+    key: "Tab",
     mode: "nav",
     action: (editor) => {
       const sel = editor.getSelectedId();

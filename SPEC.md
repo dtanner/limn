@@ -411,7 +411,7 @@ test('Cmd+Z undoes node creation', () => {
 
 The app has two distinct modes, following the MindNode/Excel paradigm:
 
-**Navigation mode** (default): Keyboard input operates on tree structure. Arrow keys move selection spatially (direction relative to screen position, not tree structure). Tab creates child nodes. Enter enters edit mode. Shortcuts modify the selected node. When nothing is selected (empty canvas or after deselect), Enter creates a new root node. When nothing is selected, arrow keys select the visible node closest to the center of the viewport.
+**Navigation mode** (default): Keyboard input operates on tree structure. Arrow keys move selection spatially (direction relative to screen position, not tree structure). Tab creates child nodes. Shift+Tab detaches a child to become a new root. Enter enters edit mode. Shortcuts modify the selected node. When nothing is selected (empty canvas or after deselect), Enter creates a new root node. When nothing is selected, arrow keys select the visible node closest to the center of the viewport.
 
 **Edit mode** (entered via Enter when node is selected, or double-click on node): Keyboard input goes to an absolutely-positioned textarea overlaid on the node (not SVG foreignObject, which has cross-browser issues). Arrow keys move within text. If text is already in node, cursor starts at the end of the current text. Escape exits to navigation mode. Creating a new node (Tab) automatically enters edit mode for that node. Nodes support multi-line text: Shift+Enter inserts a newline, Enter exits edit mode and creates a sibling, Tab exits edit mode and creates a child.
 
@@ -426,6 +426,7 @@ Several shortcuts (⌘+S, ⌘+O, ⌘+0, ⌘+1, ⌘+=, ⌘+-) conflict with brows
 | Context | Action | Shortcut | Behavior |
 |---------|--------|----------|----------|
 | Node selected | Create child | Tab | New child of selected node; enters edit mode |
+| Node selected | Detach to root | Shift+Tab | Detach selected node (and its subtree) from parent, making it a new root. No-op on root nodes |
 | Node selected | Create sibling below | Shift+enter | New sibling after selected node; enters edit mode. No-op on root nodes (roots have no parent, so "sibling" is undefined; use Escape then Enter to create a new root) |
 | Node selected | Navigate left | ← | Spatial: toward parent on right-side branches, toward children on left-side branches |
 | Node selected | Navigate right | → | Spatial: toward children on right-side branches, toward parent on left-side branches |

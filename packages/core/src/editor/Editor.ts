@@ -365,6 +365,15 @@ export class Editor {
     return id;
   }
 
+  detachToRoot(nodeId: string): void {
+    const node = this.store.getNode(nodeId);
+    if (node.parentId === null) return; // Already a root
+    this.pushUndo("detach-to-root");
+    this.store.detachToRoot(nodeId);
+    this.resolveOverlapForNode(nodeId);
+    this.notify();
+  }
+
   deleteNode(nodeId: string): void {
     this.pushUndo("delete-node");
     const node = this.store.getNode(nodeId);
