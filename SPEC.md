@@ -114,7 +114,6 @@ packages/
       layout/          # @dagrejs/dagre integration, position computation
       serialization/   # JSON ↔ model, markdown export
       test-editor/     # TestEditor subclass for testing
-      operations/      # Grouped mutation functions (not Command pattern)
 
   web/                 # React web application
     src/
@@ -175,8 +174,7 @@ interface MindMap {
   assets: Asset[];
   meta: {
     version: number;
-    theme: string;
-    layoutMode: 'horizontal' | 'down';  // horizontal: children extend rightward by default, user can drag branches left; down: top-to-bottom org chart
+    theme: string; // "default", this is a placeholder
   };
 }
 ```
@@ -254,8 +252,7 @@ class Editor {
   // Mutations (all produce tracked diffs for undo)
   addRoot(text?: string, x?: number, y?: number): string;  // Returns new root ID
   addChild(parentId: string, text?: string): string;        // Returns new node ID
-  addSibling(nodeId: string, text?: string): string;        // On a root, creates another root
-  addSiblingAbove(nodeId: string, text?: string): string;
+  addSibling(parentId: string, index: number, text?: string): string;  // On a root no-op. If index > parent's children, inserts at end, <0 is error
   deleteNode(nodeId: string): void;     // Deletes root and subtree; empty canvas if last
   setText(nodeId: string, text: string): void;
   moveNode(nodeId: string, newParentId: string, index?: number): void;
@@ -373,7 +370,7 @@ test('Cmd+Z undoes node creation', () => {
 
 The app has two distinct modes, following the MindNode/Excel paradigm:
 
-**Navigation mode** (default): Keyboard input operates on tree structure. Arrow keys move selection spatially (direction relative to screen position, not tree structure). Tab creates child nodes. Enter enters edit mode. Shortcuts modify the selected node. When nothing is selected (empty canvas or after deselect), Enter creates a new root node.
+**Navigation mode** (default): Keyboard input operates on tree structure. Arrow keys move selection spatially (direction relative to screen position, not tree structure). Tab creates child nodes. Enter enters edit mode. Shortcuts modify the selected node. When nothing is selected (empty canvas or after deselect), Enter creates a new root node. When nothing is selected, arrow keys will select the node closest to the center of the canvas if no nodes are directly in the center, find the closest node in the direction of the arrow key.
 
 **Edit mode** (entered via Enter when node is selected, or double-click on node): Keyboard input goes to an absolutely-positioned textarea overlaid on the node (not SVG foreignObject, which has cross-browser issues). Arrow keys move within text. If text is already in node, cursor starts at the end of the current text. Escape exits to navigation mode. Creating a new node (Tab) automatically enters edit mode for that node. Nodes support multi-line text: Shift+Enter inserts a newline, Enter exits edit mode and creates a sibling, Tab exits edit mode and creates a child.
 
@@ -382,16 +379,19 @@ The app has two distinct modes, following the MindNode/Excel paradigm:
 | Context | Action | Shortcut | Behavior |
 |---------|--------|----------|----------|
 | Node selected | Create child | Tab | New child of selected node; enters edit mode |
+| Node selected | Create sibling below | Shift+enter | New sibling after selected node; enters edit mode, no-op if current node is root |
 | Node selected | Navigate left | ← | Spatial: toward parent on right-side branches, toward children on left-side branches |
 | Node selected | Navigate right | → | Spatial: toward children on right-side branches, toward parent on left-side branches |
 | Node selected | Navigate down | ↓ | Move to next visually-below node (can cross parent and tree boundaries) |
 | Node selected | Navigate up | ↑ | Move to previous visually-above node (can cross parent and tree boundaries) |
 | Node selected | Enter edit mode | Enter | Cursor at end of node's text |
-| Node selected | Delete node | Backspace | Remove node and entire subtree; no-op if nothing selected |
+| Node selected | Delete node | Backspace | Remove node and entire subtree; no-op if nothing selected, select parent (if any) |
 | Node selected | Collapse/expand | Space | Toggle selected node's collapsed state |
 | Node selected | Move node up | ⌘+↑ | Reorder among siblings |
 | Node selected | Move node down | ⌘+↓ | Reorder among siblings |
+| Node selected | Deselect | Escape | Deselect currently selected node |
 | Nothing selected | Create root | Enter | New root node at canvas center; enters edit mode |
+| Any | Move canvas | Shift+(←/→/↓/↑) | Move canvas in the direction of the arrow 10% of the current zoom level |
 | Any | Undo | ⌘+Z | Invert last diff |
 | Any | Redo | ⇧+⌘+Z | Reapply last undone diff |
 | Any | Zoom to fit | ⌘+0 | Fit all visible nodes in viewport |
@@ -463,8 +463,8 @@ Following tldraw's architecture, undo/redo is automatic and diff-based rather th
 - Drag an image file from Finder onto a node → image attaches to that node
 - Drag an image onto the canvas (not a node) → creates a new node with the image
 - Paste an image from clipboard → attaches to selected node, if no node selected creates a new node with the image
-- Resize handles on the image corners; free resize by default (hold Shift to constrain aspect ratio)
-- Delete key on a selected image removes the image from the node (not the node itself)
+- Resize handles on the image corners; constrained aspect ratio by default, hold shift to free resize
+- Backspace key on a selected image removes the image from the node (not the node itself)
 
 ### Storage
 
@@ -555,7 +555,7 @@ Chunks 2 and 3 can be developed in parallel (they share types but are otherwise 
 | Chunk | Scope | Deliverables | Tests |
 |-------|-------|-------------|-------|
 | **8. Keyboard navigation** | Spatial arrow key traversal (direction-aware), Tab creates child, Enter enters edit mode, Enter with nothing selected creates root, focus management, mode switching (nav/edit) | `web/src/input/keyboard.ts`; wired to Editor | TestEditor keyboard tests (the bulk of testing happens here); spatial navigation tests across tree boundaries |
-| **9. Text editing** | Absolutely-positioned textarea over canvas (not foreignObject); F2 to enter, Escape to exit; auto-enter on node creation; zoom-aware transforms | `web/src/components/EditableNode.tsx` | TestEditor type() tests; Playwright text rendering verification |
+| **9. Text editing** | Absolutely-positioned textarea over canvas (not foreignObject); Enter to edit text, Escape to exit; auto-enter on node creation; zoom-aware transforms | `web/src/components/EditableNode.tsx` | TestEditor type() tests; Playwright text rendering verification |
 | **10. Collapse/expand** | Toggle collapse, Space shortcut, animated transitions for showing/hiding children | Wired through Editor | TestEditor collapse state tests |
 | **11. Mouse interaction** | Click to select, double-click to edit (on node) or create root (on canvas), drag to pan (on canvas), drag to reposition nodes (updates stored x/y), drag to reparent, scroll to zoom | `web/src/input/mouse.ts` | TestEditor pointer simulation tests; drag-to-reposition tests |
 | **12. Image support** | Drag-and-drop images, paste from clipboard, resize handles, asset registry, sidecar storage | `core/src/model/assets.ts`; `web/src/components/ImageNode.tsx` | Unit tests for asset lifecycle; Playwright drag-drop E2E |
