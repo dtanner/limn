@@ -171,8 +171,8 @@ export function App() {
               editor.setNodeImage(selectedId, asset, displayWidth, displayHeight);
             } else {
               const rootId = editor.addRoot("", 0, 0);
-              editor.exitEditMode();
               editor.setNodeImage(rootId, asset, displayWidth, displayHeight);
+              editor.exitEditMode();
             }
 
             setAssetUrls((prev) => {

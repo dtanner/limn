@@ -315,7 +315,7 @@ export class Editor {
     // Empty node cleanup: if the node has empty text, delete it
     if (this.selectedId !== null) {
       const node = this.store.getNode(this.selectedId);
-      if (node.text === "") {
+      if (node.text === "" && !node.image) {
         const nodeToDelete = this.selectedId;
         this.selectFallbackAfterDelete(nodeToDelete);
         this.store.deleteNode(nodeToDelete);

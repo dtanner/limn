@@ -147,6 +147,19 @@ describe("image support", () => {
     expect(editor2.getAssets()).toHaveLength(1);
   });
 
+  it("should not auto-delete empty node that has an image", () => {
+    const editor = new TestEditor();
+    const rootId = editor.addRoot("", 0, 0);
+    // Set image while still in edit mode (empty text)
+    editor.setNodeImage(rootId, makeAsset("a1"), 400, 300);
+    editor.exitEditMode();
+
+    // Node should survive because it has an image
+    const node = editor.getNode(rootId);
+    expect(node.image).toBeDefined();
+    expect(node.text).toBe("");
+  });
+
   it("should replace an existing image on a node", () => {
     const editor = new TestEditor();
     editor.addRoot("root", 0, 0);
