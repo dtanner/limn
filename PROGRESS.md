@@ -3,7 +3,7 @@
 ## Current status
 
 **Phase**: Phase 3 -- Interaction
-**Next chunk**: Chunk 9 (Text editing)
+**Next chunk**: Chunk 10 (Collapse/expand + mouse interaction)
 **Last updated**: 2026-02-26
 
 ---
@@ -203,8 +203,30 @@
 **Tests added:**
 - 24 navigation tests: up/down nearest-by-y, left/right direction-aware, bidirectional branches, cross-tree navigation, collapsed node expansion, keyboard dispatch
 
-### Up next: Chunk 9
-- Text editing with positioned textarea overlay
+### Chunk 9: Text editing (2026-02-26)
+
+**What was done:**
+- TextEditor component: absolutely-positioned textarea overlay on editing node
+- Zoom-aware positioning: textarea scales with camera zoom/pan
+- Key routing in textarea: Enter exits+creates sibling, Tab exits+creates child, Escape exits
+- Shift+Enter inserts newline (browser default behavior)
+- Cmd+Z/Shift+Cmd+Z for undo/redo from within textarea
+- Text changes flow to Editor.setText() via onChange
+- Auto-focus with cursor at end of existing text
+- data-mindforge-edit attribute to distinguish from other textareas
+- Double-click on node enters edit mode
+- Double-click on canvas creates new root at click position
+- Click on different node while editing exits edit mode first
+
+**Files changed:**
+- `packages/web/src/components/TextEditor.tsx` -- textarea overlay component
+- `packages/web/src/components/MindMapCanvas.tsx` -- renders TextEditor, double-click handlers
+
+**Tests added:**
+- Visual verification via dev server (text editing is a browser interaction; core text/mode logic already covered by TestEditor tests)
+
+### Up next: Chunk 10
+- Remaining mouse interaction (drag to pan is done, still need drag-to-reposition nodes)
 
 ---
 

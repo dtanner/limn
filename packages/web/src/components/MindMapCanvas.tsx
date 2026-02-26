@@ -6,6 +6,7 @@ import type { MindMapNode } from "@mindforge/core";
 import { useEditor } from "../hooks/useEditor";
 import { NodeView } from "./NodeView";
 import { EdgeView } from "./EdgeView";
+import { TextEditor } from "./TextEditor";
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 3;
@@ -19,7 +20,11 @@ export function MindMapCanvas() {
   const camera = editor.getCamera();
   const visibleNodes = editor.getVisibleNodes();
   const selectedId = editor.getSelectedId();
+  const isEditing = editor.isEditing();
   const rootIds = new Set(editor.getRoots().map((r) => r.id));
+
+  // Get the editing node for the TextEditor overlay
+  const editingNode = isEditing && selectedId ? editor.getNode(selectedId) : null;
 
   // Collect all parent-child edges for visible nodes
   const edges: { parent: MindMapNode; child: MindMapNode }[] = [];
@@ -102,43 +107,82 @@ export function MindMapCanvas() {
 
   const handleNodeClick = useCallback(
     (nodeId: string) => {
+      if (editor.getSelectedId() === nodeId && !editor.isEditing()) {
+        // Already selected: don't re-select (would trigger unnecessary notify)
+        return;
+      }
+      if (editor.isEditing()) {
+        editor.exitEditMode();
+      }
       editor.select(nodeId);
     },
     [editor],
   );
 
+  const handleNodeDoubleClick = useCallback(
+    (nodeId: string) => {
+      editor.select(nodeId);
+      editor.enterEditMode();
+    },
+    [editor],
+  );
+
+  const handleCanvasDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      // Double-click on canvas background: create new root
+      const target = e.target as SVGElement;
+      if (target.tagName !== "svg" && !target.classList.contains("canvas-bg")) {
+        return;
+      }
+      const svg = svgRef.current;
+      if (!svg) return;
+      const rect = svg.getBoundingClientRect();
+      const worldX = (e.clientX - rect.left - camera.x) / camera.zoom;
+      const worldY = (e.clientY - rect.top - camera.y) / camera.zoom;
+      editor.addRoot("", worldX, worldY);
+    },
+    [editor, camera],
+  );
+
   return (
-    <svg
-      ref={svgRef}
-      style={{
-        width: "100%",
-        height: "100%",
-        cursor: isPanning.current ? "grabbing" : "default",
-      }}
-      onWheel={handleWheel}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-    >
-      <rect className="canvas-bg" width="100%" height="100%" fill="#f9fafb" />
-      <g transform={`translate(${camera.x}, ${camera.y}) scale(${camera.zoom})`}>
-        {edges.map((edge) => (
-          <EdgeView
-            key={`${edge.parent.id}-${edge.child.id}`}
-            parent={edge.parent}
-            child={edge.child}
-          />
-        ))}
-        {visibleNodes.map((node) => (
-          <g
-            key={node.id}
-            onClick={() => handleNodeClick(node.id)}
-            style={{ cursor: "pointer" }}
-          >
-            <NodeView node={node} isSelected={node.id === selectedId} isRoot={rootIds.has(node.id)} />
-          </g>
-        ))}
-      </g>
-    </svg>
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <svg
+        ref={svgRef}
+        style={{
+          width: "100%",
+          height: "100%",
+          cursor: isPanning.current ? "grabbing" : "default",
+        }}
+        onWheel={handleWheel}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onDoubleClick={handleCanvasDoubleClick}
+      >
+        <rect className="canvas-bg" width="100%" height="100%" fill="#f9fafb" />
+        <g transform={`translate(${camera.x}, ${camera.y}) scale(${camera.zoom})`}>
+          {edges.map((edge) => (
+            <EdgeView
+              key={`${edge.parent.id}-${edge.child.id}`}
+              parent={edge.parent}
+              child={edge.child}
+            />
+          ))}
+          {visibleNodes.map((node) => (
+            <g
+              key={node.id}
+              onClick={() => handleNodeClick(node.id)}
+              onDoubleClick={() => handleNodeDoubleClick(node.id)}
+              style={{ cursor: "pointer" }}
+            >
+              <NodeView node={node} isSelected={node.id === selectedId} isRoot={rootIds.has(node.id)} />
+            </g>
+          ))}
+        </g>
+      </svg>
+      {editingNode && (
+        <TextEditor editor={editor} node={editingNode} camera={camera} />
+      )}
+    </div>
   );
 }

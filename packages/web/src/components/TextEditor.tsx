@@ -1,0 +1,111 @@
+// ABOUTME: Absolutely-positioned textarea overlay for editing node text.
+// ABOUTME: Zoom-aware positioning; delegates key events to core dispatch.
+
+import { useEffect, useRef, useCallback } from "react";
+import { dispatch } from "@mindforge/core";
+import type { Editor, MindMapNode, Camera } from "@mindforge/core";
+
+const PADDING_X = 10;
+const PADDING_Y = 6;
+const FONT_SIZE = 14;
+
+interface TextEditorProps {
+  editor: Editor;
+  node: MindMapNode;
+  camera: Camera;
+}
+
+export function TextEditor({ editor, node, camera }: TextEditorProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Position the textarea to overlay the node, accounting for camera transform
+  const left = node.x * camera.zoom + camera.x;
+  const top = node.y * camera.zoom + camera.y;
+  const width = node.width * camera.zoom;
+  const height = node.height * camera.zoom;
+
+  // Focus the textarea on mount
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (el) {
+      el.focus();
+      // Place cursor at end of text
+      el.selectionStart = el.value.length;
+      el.selectionEnd = el.value.length;
+    }
+  }, []);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // Shift+Enter: insert newline (let browser handle it)
+      if (e.key === "Enter" && e.shiftKey) {
+        return;
+      }
+
+      // Keys handled by dispatch: Enter, Tab, Escape
+      if (e.key === "Enter" || e.key === "Tab" || e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        dispatch(editor, e.key, {
+          meta: e.metaKey,
+          shift: e.shiftKey,
+          ctrl: e.ctrlKey,
+          alt: e.altKey,
+        });
+        return;
+      }
+
+      // Cmd+Z / Cmd+Shift+Z for undo/redo
+      if (e.key === "z" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        e.stopPropagation();
+        dispatch(editor, e.key, {
+          meta: e.metaKey,
+          shift: e.shiftKey,
+          ctrl: e.ctrlKey,
+          alt: e.altKey,
+        });
+        return;
+      }
+    },
+    [editor],
+  );
+
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      editor.setText(node.id, e.target.value);
+    },
+    [editor, node.id],
+  );
+
+  return (
+    <textarea
+      ref={textareaRef}
+      data-mindforge-edit="true"
+      value={node.text}
+      onChange={handleChange}
+      onKeyDown={handleKeyDown}
+      style={{
+        position: "absolute",
+        left: `${left}px`,
+        top: `${top}px`,
+        width: `${width}px`,
+        minHeight: `${height}px`,
+        padding: `${PADDING_Y * camera.zoom}px ${PADDING_X * camera.zoom}px`,
+        fontSize: `${FONT_SIZE * camera.zoom}px`,
+        fontFamily: "system-ui, -apple-system, sans-serif",
+        fontWeight: node.parentId === null ? 600 : 400,
+        lineHeight: `${20 * camera.zoom}px`,
+        border: `${2 * camera.zoom}px solid #3b82f6`,
+        borderRadius: `${6 * camera.zoom}px`,
+        outline: "none",
+        background: "#ffffff",
+        color: "#1f2937",
+        resize: "none",
+        overflow: "hidden",
+        boxSizing: "border-box",
+        zIndex: 10,
+      }}
+    />
+  );
+}
