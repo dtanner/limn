@@ -99,7 +99,7 @@ Excalidraw proved this model: they deprecated their Electron app because the web
 1. **The Editor is the source of truth, not the DOM.** All state mutations flow through the Editor API. The DOM is a rendering target. This enables the TestEditor pattern.
 2. **Diff-based undo, not command-based.** The store captures diffs for every mutation automatically. Undo inverts the diff. No need to maintain Command classes for every operation.
 3. **Flat runtime model, nested file format.** In memory, nodes live in a flat Map keyed by ID with both `parentId` and `children[]` references (O(1) parent lookup, ordered child traversal). On disk, they serialize as a nested tree (clean diffs, human-readable).
-4. **Positions are stored.** The layout engine (dagre) computes positions for newly created trees. Incremental mutations shift siblings to make or close space. Users can reposition nodes by dragging. Manual positions are never overridden by automatic layout. The file format includes x/y coordinates for every node.
+4. **Positions and dimensions are stored.** The layout engine (dagre) computes positions for newly created trees. Incremental mutations shift siblings to make or close space. Users can reposition nodes by dragging. Manual positions are never overridden by automatic layout. The file format includes x/y/width/height for every node. Width is user-adjustable (drag right edge of node); height is auto-computed from text content reflowed within the current width. No automatic word wrap on new nodes -- the user controls line breaks with Shift+Enter, and width grows to fit text until manually constrained.
 5. **Multiple roots (forest).** A mind map can contain multiple independent root trees on the same canvas. Roots can be created and deleted freely. An empty canvas is a valid state.
 6. **Images stored as sidecar files.** Binary assets live in a `{name}.assets/` directory alongside the JSON file, referenced by relative path. This keeps the JSON diffable and the assets manageable in git.
 
@@ -107,7 +107,7 @@ Excalidraw proved this model: they deprecated their Electron app because the web
 
 ```
 packages/
-  core/               # Zero-dependency TypeScript library
+  core/               # Framework-agnostic TS library (no React, no browser APIs)
     src/
       model/           # MindMapNode, MindMap types
       store/           # Reactive store with diff tracking
@@ -139,6 +139,8 @@ interface MindMapNode {
   collapsed: boolean;      // Whether children are hidden
   x: number;               // Horizontal position (stored, computed initially by layout engine)
   y: number;               // Vertical position (stored, computed initially by layout engine)
+  width: number;           // Node width (user-adjustable by dragging right edge; text reflows within)
+  height: number;          // Node height (auto-computed from text content and width)
   style?: NodeStyle;       // Optional color, shape overrides
   image?: ImageRef;        // Optional attached image
 }
@@ -173,6 +175,7 @@ interface MindMap {
   assets: Asset[];
   camera: Camera;          // Persisted viewport state
   meta: {
+    id: string;            // Stable document UUID, generated on creation, preserved across saves
     version: number;
     theme: string; // "default", this is a placeholder
   };
@@ -184,6 +187,8 @@ interface MindMapFileNode {
   text: string;
   x: number;
   y: number;
+  width: number;
+  height: number;
   children: MindMapFileNode[];  // Inline nested nodes (not ID references)
   collapsed?: boolean;          // Omitted when false
   style?: NodeStyle;
@@ -194,6 +199,7 @@ interface MindMapFileNode {
 interface MindMapFileFormat {
   version: number;
   meta: {
+    id: string;            // Document UUID — used as IndexedDB key for auto-save and cross-tab sync
     theme: string;
   };
   camera: Camera;
@@ -209,7 +215,7 @@ On disk, the flat map serializes as a nested tree for readability and clean diff
 ```json
 {
   "version": 1,
-  "meta": { "theme": "default" },
+  "meta": { "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479", "theme": "default" },
   "camera": { "x": 0, "y": 0, "zoom": 1.0 },
   "roots": [
     {
@@ -217,19 +223,25 @@ On disk, the flat map serializes as a nested tree for readability and clean diff
       "text": "Project Plan",
       "x": 0,
       "y": 0,
+      "width": 120,
+      "height": 30,
       "children": [
         {
           "id": "n1",
           "text": "Phase 1",
           "x": 250,
           "y": -60,
+          "width": 100,
+          "height": 30,
           "children": [
-            { "id": "n3", "text": "Research", "x": 480, "y": -90, "children": [] },
+            { "id": "n3", "text": "Research", "x": 480, "y": -90, "width": 100, "height": 30, "children": [] },
             {
               "id": "n4",
               "text": "Architecture",
               "x": 480,
               "y": -30,
+              "width": 100,
+              "height": 30,
               "children": [],
               "image": { "assetId": "a1", "width": 400, "height": 300 }
             }
@@ -240,9 +252,11 @@ On disk, the flat map serializes as a nested tree for readability and clean diff
           "text": "Phase 2",
           "x": 250,
           "y": 60,
+          "width": 100,
+          "height": 30,
           "collapsed": true,
           "children": [
-            { "id": "n5", "text": "Implementation", "x": 480, "y": 60, "children": [] }
+            { "id": "n5", "text": "Implementation", "x": 480, "y": 60, "width": 120, "height": 30, "children": [] }
           ]
         }
       ]
@@ -278,6 +292,7 @@ class Editor {
   moveNode(nodeId: string, newParentId: string, index?: number): void;
   reorderNode(nodeId: string, direction: 'up' | 'down'): void;
   setNodePosition(nodeId: string, x: number, y: number): void;  // Manual repositioning
+  setNodeWidth(nodeId: string, width: number): void;  // Resize width; height recomputes from text reflow
   toggleCollapse(nodeId: string): void;
   setNodeImage(nodeId: string, asset: Asset): void;
   removeNodeImage(nodeId: string): void;
@@ -427,7 +442,7 @@ Several shortcuts (⌘+S, ⌘+O, ⌘+0, ⌘+1, ⌘+=, ⌘+-) conflict with brows
 | Context | Action | Shortcut | Behavior |
 |---------|--------|----------|----------|
 | Editing | Exit edit mode | Escape | Return to navigation mode |
-| Editing | Create sibling | Enter | Exit edit mode and create sibling node; enters edit mode on new node. If editing a root node, just exits edit mode (no sibling created) |
+| Editing | Create sibling | Enter | Exit edit mode and create sibling node; enters edit mode on new node. If editing a root node, just exits edit mode (no sibling created -- roots have no parent, so "sibling" is meaningless; use Escape then Enter to create a new root instead) |
 | Editing | Create child | Tab | Exit edit mode and create child node; enters edit mode on new node |
 | Editing | Newline | Shift+Enter | Adds a newline to the text at cursor position, stays in edit mode |
 
@@ -514,7 +529,7 @@ In the browser (before explicit save), images are held in memory as Blob URLs an
 
 ### Auto-save (IndexedDB)
 
-Every mutation is debounced (500ms) and auto-saved to IndexedDB via `idb-keyval`. This survives tab closes and browser restarts. A `persistenceKey` identifies each document. Cross-tab sync uses BroadcastChannel with a monotonic revision counter stored alongside the document in IndexedDB. When a tab saves, it increments the revision and broadcasts the new value. Tabs that receive a higher revision reload the document state and show a non-blocking toast: "Document updated from another tab." No merge logic for v1.
+Every mutation is debounced (500ms) and auto-saved to IndexedDB via `idb-keyval`. This survives tab closes and browser restarts. Each document has a UUID (`meta.id`), generated when the document is first created and preserved across saves and reloads. This UUID is the IndexedDB key for auto-save storage. Cross-tab sync uses BroadcastChannel keyed by document UUID with a monotonic revision counter stored alongside the document in IndexedDB. When a tab saves, it increments the revision and broadcasts the new value. Tabs that receive a higher revision reload the document state and show a non-blocking toast: "Document updated from another tab." No merge logic for v1.
 
 ### Explicit save (File System Access API)
 
@@ -610,13 +625,11 @@ This parallelization can cut total development time by ~20-25%.
 
 ## 11. Testing strategy
 
-### Three-layer testing pyramid
+### Two-layer testing approach
 
-**Layer 1: Unit tests via TestEditor (90% of tests)**. The TestEditor simulates all user interactions programmatically — keyboard events, pointer events, state transitions — without a browser. Tests run in milliseconds. This is where the vast majority of correctness verification happens: tree operations, keyboard navigation, undo/redo, collapse/expand, mode switching, text editing state machine, and edge cases.
+**Layer 1: Unit tests via TestEditor (vast majority of tests).** The TestEditor simulates all user interactions programmatically — keyboard events, pointer events, state transitions — without a browser. Tests run in milliseconds. This is where correctness verification happens: tree operations, keyboard navigation, undo/redo, collapse/expand, mode switching, text editing state machine, and edge cases. If you're tempted to write a Playwright test, first ask whether the behavior can be verified through the Editor API instead.
 
-**Layer 2: Visual regression via Playwright (~8% of tests)**. Playwright launches the web app on localhost, takes screenshots, and compares against baselines. This verifies that the SVG rendering, layout positions, animations, and styling look correct. These tests are slower (seconds each) but catch rendering bugs that unit tests cannot.
-
-**Layer 3: Integration/E2E via Playwright (~2% of tests)**. Full user flows: open file → edit → save → reopen → verify. File dialog interactions, service worker offline behavior, export workflows. These are the most expensive tests and cover the thin integration layer between the core engine and browser APIs.
+**Layer 2: Browser tests via Playwright (as few as possible).** Playwright tests are for things that genuinely require a browser: verifying SVG rendering looks correct (screenshot comparison), file dialog interactions, service worker behavior, clipboard/drag-drop with real browser APIs. These tests are slow (seconds each) and should only be written when TestEditor cannot cover the behavior.
 
 ### What Claude Code can verify
 

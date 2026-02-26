@@ -7,7 +7,7 @@ MindForge — keyboard-first, offline-capable mind map PWA.
 - Core engine: TypeScript (strict), zero browser dependencies
 - Web app: React 19, Vite, SVG rendering, custom pan/zoom (pure math)
 - Layout: @dagrejs/dagre
-- Testing: Vitest (unit via TestEditor), Playwright (visual regression only)
+- Testing: Vitest (unit via TestEditor), Playwright (browser-dependent tests only)
 - File I/O: browser-fs-access
 - Package manager: Bun (Playwright uses Node.js)
 
