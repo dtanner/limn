@@ -5,6 +5,13 @@ import type { MindMapNode, TextMeasurer, MindMapMeta } from "../model/types";
 import { MindMapStore } from "../store/MindMapStore";
 import { deserialize, serialize } from "../serialization/serialization";
 import type { MindMapFileFormat } from "../serialization/schema";
+import {
+  positionNewChild,
+  positionNewSibling,
+  relayoutAfterDelete,
+  relayoutFromNode,
+  resolveTreeOverlap,
+} from "../layout/layout";
 
 /** Snapshot of document state for undo/redo. */
 interface HistoryEntry {
@@ -137,7 +144,8 @@ export class Editor {
   addChild(parentId: string, text = ""): string {
     this.pushUndo("add-child");
     const id = this.store.addChild(parentId, text);
-    this.positionNewChild(id, parentId);
+    positionNewChild(this.store, id);
+    this.resolveOverlapForNode(id);
     this.selectedId = id;
     this.editing = true;
     return id;
@@ -151,7 +159,8 @@ export class Editor {
     const siblings = this.store.getNode(parentId).children;
     const index = siblings.indexOf(nodeId) + 1;
     const id = this.store.insertChild(parentId, index, text);
-    this.positionNewSibling(id, nodeId);
+    positionNewSibling(this.store, id, nodeId);
+    this.resolveOverlapForNode(id);
     this.selectedId = id;
     this.editing = true;
     return id;
@@ -159,8 +168,14 @@ export class Editor {
 
   deleteNode(nodeId: string): void {
     this.pushUndo("delete-node");
+    const node = this.store.getNode(nodeId);
+    const parentId = node.parentId;
     this.selectFallbackAfterDelete(nodeId);
     this.store.deleteNode(nodeId);
+    if (parentId !== null) {
+      relayoutAfterDelete(this.store, parentId);
+      this.resolveOverlapForNode(parentId);
+    }
   }
 
   setText(nodeId: string, text: string): void {
@@ -171,6 +186,8 @@ export class Editor {
   toggleCollapse(nodeId: string): void {
     this.pushUndo("toggle-collapse");
     this.store.toggleCollapse(nodeId);
+    relayoutFromNode(this.store, nodeId);
+    this.resolveOverlapForNode(nodeId);
   }
 
   reorderNode(nodeId: string, direction: "up" | "down"): void {
@@ -283,35 +300,15 @@ export class Editor {
     this.editing = false;
   }
 
-  /** Simple heuristic: position child to the right of parent */
-  private positionNewChild(childId: string, parentId: string): void {
-    const parent = this.store.getNode(parentId);
-    const siblings = this.store.getChildren(parentId);
-    const childIndex = siblings.findIndex((s) => s.id === childId);
-    const gap = 52; // height + padding
-
-    if (siblings.length === 1) {
-      // Only child: same y as parent
-      this.store.setNodePosition(childId, parent.x + 250, parent.y);
-    } else {
-      // Stack below last sibling
-      const prevSibling = siblings[childIndex - 1];
-      if (prevSibling) {
-        this.store.setNodePosition(
-          childId,
-          prevSibling.x,
-          prevSibling.y + gap,
-        );
-      } else {
-        this.store.setNodePosition(childId, parent.x + 250, parent.y);
-      }
+  /** Find the root of a node and resolve cross-tree overlap. */
+  private resolveOverlapForNode(nodeId: string): void {
+    // Walk up to root
+    let rootId = nodeId;
+    let node = this.store.getNode(rootId);
+    while (node.parentId !== null) {
+      rootId = node.parentId;
+      node = this.store.getNode(rootId);
     }
-  }
-
-  /** Simple heuristic: position sibling below the reference node */
-  private positionNewSibling(siblingId: string, referenceId: string): void {
-    const ref = this.store.getNode(referenceId);
-    const gap = 52;
-    this.store.setNodePosition(siblingId, ref.x, ref.y + gap);
+    resolveTreeOverlap(this.store, rootId);
   }
 }

@@ -2,8 +2,8 @@
 
 ## Current status
 
-**Phase**: Phase 1 -- Foundation
-**Next chunk**: Chunk 5 (Layout engine)
+**Phase**: Phase 2 -- Visual Shell
+**Next chunk**: Chunk 6 (SVG renderer)
 **Last updated**: 2026-02-26
 
 ---
@@ -104,8 +104,37 @@
 - Undo uses full-state snapshots rather than fine-grained diffs for initial simplicity; can optimize later if performance requires it
 - Empty node cleanup on Escape is not tracked by undo (it's part of the exit-edit-mode flow, not a separate user action)
 
-### Up next: Chunk 5
-- [ ] 30+ tests covering operations, undo/redo, keyboard simulation via dispatch
+### Chunk 5: Layout engine (2026-02-26)
+
+**What was done:**
+- Incremental layout engine with horizontal placement (H_OFFSET=250) and vertical centering (V_GAP=20)
+- subtreeHeight computes visible subtree space (respects collapsed state)
+- branchDirection infers left/right from stored positions
+- positionNewChild and positionNewSibling place new nodes and re-center siblings
+- centerChildren distributes children around parent's visual center
+- shiftSubtree moves entire subtrees as rigid units
+- relayoutFromNode walks up to root re-centering at each level
+- relayoutAfterDelete re-centers after node removal
+- treeBoundingBox and resolveTreeOverlap push root trees apart when they overlap
+- Integrated layout into Editor: addChild, addSibling, deleteNode, toggleCollapse
+- Fixed ID collision bug: loadNode now advances ID counter past loaded numeric IDs
+
+**Files changed:**
+- `packages/core/src/layout/layout.ts` -- incremental layout engine
+- `packages/core/src/editor/Editor.ts` -- integrated layout calls into mutations
+- `packages/core/src/store/MindMapStore.ts` -- loadNode advances ID counter past loaded IDs
+- `packages/core/src/index.ts` -- re-exports layout functions
+
+**Tests added:**
+- 13 layout tests: horizontal placement, vertical centering, sibling shifting on add/delete, collapsed subtree handling, rigid subtree shifting, left-side branches, cross-tree overlap
+
+**Notes/decisions:**
+- Centering uses parent's visual center (parent.y + parent.height/2), not parent.y
+- Branch direction for first child inferred from parent's branch direction (supports left-side trees)
+- ID collision fix critical: without it, addChild after deserialization could overwrite existing nodes
+
+### Up next: Chunk 6
+- SVG renderer in packages/web/
 
 ---
 

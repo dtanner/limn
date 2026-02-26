@@ -98,6 +98,14 @@ export class MindMapStore {
   /** Load a pre-built node (used by deserialization). */
   loadNode(node: MindMapNode): void {
     this.nodes.set(node.id, node);
+    // Advance ID counter past any loaded numeric IDs to prevent collisions
+    const match = /^n(\d+)$/.exec(node.id);
+    if (match) {
+      const num = parseInt(match[1], 10) + 1;
+      if (num > nextIdCounter) {
+        nextIdCounter = num;
+      }
+    }
   }
 
   /** Register a node ID as a root (used by deserialization). */

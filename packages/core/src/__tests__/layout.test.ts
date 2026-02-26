@@ -1,0 +1,287 @@
+import { describe, test, expect, beforeEach } from "vitest";
+import { TestEditor } from "../test-editor/TestEditor";
+import type { MindMapFileFormat } from "../serialization/schema";
+
+/**
+ * Layout constants matching the implementation
+ */
+const H_OFFSET = 250;
+const V_GAP = 20;
+const NODE_HEIGHT = 32;
+
+/** Helper: build a simple single-root map */
+function singleRoot(): MindMapFileFormat {
+  return {
+    version: 1,
+    meta: { id: "test", theme: "default" },
+    camera: { x: 0, y: 0, zoom: 1 },
+    roots: [
+      {
+        id: "root",
+        text: "Root",
+        x: 0,
+        y: 0,
+        width: 100,
+        height: NODE_HEIGHT,
+        children: [],
+      },
+    ],
+    assets: [],
+  };
+}
+
+/** Helper: root with two children */
+function rootWithChildren(): MindMapFileFormat {
+  return {
+    version: 1,
+    meta: { id: "test", theme: "default" },
+    camera: { x: 0, y: 0, zoom: 1 },
+    roots: [
+      {
+        id: "root",
+        text: "Root",
+        x: 0,
+        y: 0,
+        width: 100,
+        height: NODE_HEIGHT,
+        children: [
+          {
+            id: "c1",
+            text: "Child 1",
+            x: H_OFFSET,
+            y: -26,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [],
+          },
+          {
+            id: "c2",
+            text: "Child 2",
+            x: H_OFFSET,
+            y: 26,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [],
+          },
+        ],
+      },
+    ],
+    assets: [],
+  };
+}
+
+describe("Layout engine", () => {
+  let editor: TestEditor;
+
+  describe("horizontal placement", () => {
+    beforeEach(() => {
+      editor = new TestEditor();
+      editor.loadJSON(singleRoot());
+    });
+
+    test("first child is placed at H_OFFSET to the right of parent", () => {
+      editor.select("root");
+      const childId = editor.addChild("root", "C1");
+      const child = editor.getNode(childId);
+      expect(child.x).toBe(H_OFFSET);
+    });
+
+    test("second child has same x as first child", () => {
+      const c1 = editor.addChild("root", "C1");
+      const c2 = editor.addChild("root", "C2");
+      expect(editor.getNode(c1).x).toBe(editor.getNode(c2).x);
+    });
+
+    test("grandchild is placed at 2x H_OFFSET from root", () => {
+      const c1 = editor.addChild("root", "C1");
+      const gc1 = editor.addChild(c1, "GC1");
+      expect(editor.getNode(gc1).x).toBe(H_OFFSET * 2);
+    });
+  });
+
+  describe("vertical placement", () => {
+    beforeEach(() => {
+      editor = new TestEditor();
+      editor.loadJSON(singleRoot());
+    });
+
+    test("first child is centered on parent y", () => {
+      const c1 = editor.addChild("root", "C1");
+      expect(editor.getNode(c1).y).toBe(editor.getNode("root").y);
+    });
+
+    test("two children are centered around parent y", () => {
+      const c1 = editor.addChild("root", "C1");
+      const c2 = editor.addChild("root", "C2");
+      const parentY = editor.getNode("root").y;
+      const child1Y = editor.getNode(c1).y;
+      const child2Y = editor.getNode(c2).y;
+
+      // Children should be symmetric around parent
+      const midpoint = (child1Y + child2Y) / 2;
+      expect(midpoint).toBe(parentY);
+
+      // Gap between children should be V_GAP
+      expect(child2Y - child1Y).toBe(NODE_HEIGHT + V_GAP);
+    });
+
+    test("three children are centered around parent y", () => {
+      const c1 = editor.addChild("root", "C1");
+      const c2 = editor.addChild("root", "C2");
+      const c3 = editor.addChild("root", "C3");
+      const parentY = editor.getNode("root").y;
+
+      // Middle child should be at parent y
+      expect(editor.getNode(c2).y).toBe(parentY);
+
+      // Outer children symmetric
+      expect(editor.getNode(c1).y).toBe(parentY - (NODE_HEIGHT + V_GAP));
+      expect(editor.getNode(c3).y).toBe(parentY + (NODE_HEIGHT + V_GAP));
+    });
+  });
+
+  describe("sibling shifting on delete", () => {
+    beforeEach(() => {
+      editor = new TestEditor();
+      editor.loadJSON(rootWithChildren());
+    });
+
+    test("deleting a child re-centers remaining children", () => {
+      const parentY = editor.getNode("root").y;
+      editor.select("c1");
+      editor.deleteNode("c1");
+
+      // Only c2 remains, should be centered on parent
+      expect(editor.getNode("c2").y).toBe(parentY);
+    });
+
+    test("deleting last child leaves parent childless", () => {
+      editor.deleteNode("c1");
+      editor.deleteNode("c2");
+      expect(editor.getChildren("root")).toHaveLength(0);
+    });
+  });
+
+  describe("sibling shifting on add", () => {
+    beforeEach(() => {
+      editor = new TestEditor();
+      editor.loadJSON(rootWithChildren());
+    });
+
+    test("adding a third child shifts existing children to stay centered", () => {
+      const parentY = editor.getNode("root").y;
+      const c3 = editor.addChild("root", "C3");
+
+      // Middle child (c2) should now be at parent y
+      expect(editor.getNode("c2").y).toBe(parentY);
+      expect(editor.getNode("c1").y).toBeLessThan(parentY);
+      expect(editor.getNode(c3).y).toBeGreaterThan(parentY);
+    });
+  });
+
+  describe("collapsed subtree handling", () => {
+    test("collapsed children do not affect layout of siblings", () => {
+      editor = new TestEditor();
+      editor.loadJSON(rootWithChildren());
+
+      // Add grandchildren to c1
+      const gc1 = editor.addChild("c1", "GC1");
+      const gc2 = editor.addChild("c1", "GC2");
+
+      // Record c2 position
+      const c2yExpanded = editor.getNode("c2").y;
+
+      // Collapse c1
+      editor.toggleCollapse("c1");
+
+      // c2 should move up (closer to parent) since c1's subtree no longer
+      // takes vertical space
+      const c2yCollapsed = editor.getNode("c2").y;
+      expect(c2yCollapsed).toBeLessThanOrEqual(c2yExpanded);
+
+      // Grandchildren still exist but are not visible
+      expect(editor.getNode(gc1)).toBeTruthy();
+      expect(editor.getNode(gc2)).toBeTruthy();
+    });
+  });
+
+  describe("subtree moves as rigid unit", () => {
+    test("shifting a parent moves its entire subtree", () => {
+      editor = new TestEditor();
+      editor.loadJSON(rootWithChildren());
+
+      // Add grandchild to c1
+      const gc1 = editor.addChild("c1", "GC1");
+      const c1y = editor.getNode("c1").y;
+      const gc1y = editor.getNode(gc1).y;
+      const offset = gc1y - c1y;
+
+      // Add third child to root, which will shift c1 and its subtree
+      editor.addChild("root", "C3");
+
+      const newC1y = editor.getNode("c1").y;
+      const newGc1y = editor.getNode(gc1).y;
+      // The relative offset between c1 and gc1 should be preserved
+      expect(newGc1y - newC1y).toBe(offset);
+    });
+  });
+
+  describe("left-side branches (bidirectional)", () => {
+    test("child placed to the left uses negative H_OFFSET", () => {
+      editor = new TestEditor();
+      editor.loadJSON(singleRoot());
+
+      // Manually position a child to the left
+      const c1 = editor.addChild("root", "C1");
+      editor.setNodePosition(c1, -H_OFFSET, 0);
+
+      // Adding a grandchild should go further left
+      const gc1 = editor.addChild(c1, "GC1");
+      expect(editor.getNode(gc1).x).toBeLessThan(editor.getNode(c1).x);
+    });
+  });
+
+  describe("cross-tree overlap", () => {
+    test("two root trees do not overlap after layout", () => {
+      editor = new TestEditor();
+      const map: MindMapFileFormat = {
+        version: 1,
+        meta: { id: "test", theme: "default" },
+        camera: { x: 0, y: 0, zoom: 1 },
+        roots: [
+          {
+            id: "r1",
+            text: "Root 1",
+            x: 0,
+            y: 0,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [],
+          },
+          {
+            id: "r2",
+            text: "Root 2",
+            x: 0,
+            y: 100,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [],
+          },
+        ],
+        assets: [],
+      };
+      editor.loadJSON(map);
+
+      // Add many children to r1 that would push into r2's space
+      for (let i = 0; i < 5; i++) {
+        editor.addChild("r1", `C${i}`);
+      }
+
+      // r2 should have been pushed down to avoid overlap
+      const r1Children = editor.getChildren("r1");
+      const lowestR1Child = Math.max(...r1Children.map((c) => c.y + c.height));
+      const r2y = editor.getNode("r2").y;
+      expect(r2y).toBeGreaterThanOrEqual(lowestR1Child);
+    });
+  });
+});

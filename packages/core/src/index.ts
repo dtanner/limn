@@ -28,6 +28,21 @@ export type {
   MindMapFileNode,
 } from "./serialization/schema";
 
+export {
+  subtreeHeight,
+  branchDirection,
+  positionNewChild,
+  positionNewSibling,
+  centerChildren,
+  shiftSubtree,
+  relayoutFromNode,
+  relayoutAfterDelete,
+  treeBoundingBox,
+  resolveTreeOverlap,
+  H_OFFSET,
+  V_GAP,
+} from "./layout/layout";
+
 export { Editor, stubTextMeasurer } from "./editor/Editor";
 export { dispatch } from "./keybindings/dispatch";
 export type { Modifiers } from "./keybindings/dispatch";
