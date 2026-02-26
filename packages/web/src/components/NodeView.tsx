@@ -87,7 +87,7 @@ export function NodeView({ node, isSelected, isRoot, isReparentTarget, imageUrl 
             stroke="#ffffff"
             strokeWidth={1.5}
             className="image-resize-dot"
-            style={{ cursor: "nwse-resize" }}
+            style={{ cursor: "nesw-resize" }}
           />
         </g>
       )}

@@ -417,12 +417,14 @@ export class Editor {
   setNodeImage(nodeId: string, asset: Asset, displayWidth: number, displayHeight: number): void {
     this.pushUndo("set-image");
     this.store.setNodeImage(nodeId, asset, displayWidth, displayHeight);
+    this.remeasureNode(nodeId);
     this.notify();
   }
 
   removeNodeImage(nodeId: string): void {
     this.pushUndo("remove-image");
     this.store.removeNodeImage(nodeId);
+    this.remeasureNode(nodeId);
     this.notify();
   }
 
@@ -965,6 +967,10 @@ export class Editor {
       const { width, height } = this.textMeasurer.measure(node.text, node.style);
       node.width = width;
       node.height = height;
+    }
+    // Include image height in node dimensions
+    if (node.image) {
+      node.height += node.image.height;
     }
   }
 

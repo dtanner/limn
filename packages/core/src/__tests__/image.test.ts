@@ -33,6 +33,32 @@ describe("image support", () => {
     expect(node.image).toEqual({ assetId: "a1", width: 400, height: 300 });
   });
 
+  it("should include image height in node height", () => {
+    const editor = new TestEditor();
+    editor.addRoot("root", 0, 0);
+    editor.exitEditMode();
+
+    const heightBefore = editor.getNode("n0").height;
+    const asset = makeAsset("a1");
+    editor.setNodeImage("n0", asset, 400, 300);
+
+    const heightAfter = editor.getNode("n0").height;
+    expect(heightAfter).toBe(heightBefore + 300);
+  });
+
+  it("should remove image height when image is removed", () => {
+    const editor = new TestEditor();
+    editor.addRoot("root", 0, 0);
+    editor.exitEditMode();
+
+    const heightBefore = editor.getNode("n0").height;
+    const asset = makeAsset("a1");
+    editor.setNodeImage("n0", asset, 400, 300);
+    editor.removeNodeImage("n0");
+
+    expect(editor.getNode("n0").height).toBe(heightBefore);
+  });
+
   it("should register the asset in the asset list", () => {
     const editor = new TestEditor();
     editor.addRoot("root", 0, 0);
