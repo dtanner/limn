@@ -291,21 +291,22 @@ export function MindMapCanvas() {
     [editor],
   );
 
-  const handleNodeDoubleClick = useCallback(
-    (nodeId: string) => {
-      editor.select(nodeId);
-      editor.enterEditMode();
-    },
-    [editor],
-  );
 
   const handleCanvasDoubleClick = useCallback(
     (e: React.MouseEvent) => {
-      // Double-click on canvas background: create new root
-      const target = e.target as SVGElement;
-      if (target.tagName !== "svg" && !target.classList.contains("canvas-bg")) {
+      // Use elementFromPoint to bypass pointer capture redirecting e.target to SVG
+      const actual = document.elementFromPoint(e.clientX, e.clientY) as SVGElement | null;
+      const nodeGroup = actual?.closest("[data-node-id]") as SVGElement | null;
+      if (nodeGroup) {
+        // Double-click on a node: enter edit mode
+        const nodeId = nodeGroup.getAttribute("data-node-id");
+        if (nodeId) {
+          editor.select(nodeId);
+          editor.enterEditMode();
+        }
         return;
       }
+      // Double-click on canvas background: create new root
       const svg = svgRef.current;
       if (!svg) return;
       const rect = svg.getBoundingClientRect();
@@ -457,7 +458,7 @@ export function MindMapCanvas() {
                 aria-selected={node.id === selectedId}
                 aria-expanded={hasChildren ? !node.collapsed : undefined}
                 aria-label={node.text || "Empty node"}
-                onDoubleClick={() => handleNodeDoubleClick(node.id)}
+
                 style={{
                   cursor: isDragging ? "grabbing" : "pointer",
                   transform: `translate(${node.x}px, ${node.y}px)`,
