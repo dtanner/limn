@@ -4,30 +4,22 @@ Limn — keyboard-first, offline-capable mind map progressive web app.
 
 ## Development Methodology
 
-Testing is a first-class citizen. We are using red/green development practices. Everywhere possible, we want to have a failing (red) test
-first, then make it pass (green).
+Testing is a first-class citizen. We are using red/green development practices. Everywhere possible, we want to have a failing (red) test first, then make it pass (green).
 
 For this project, you are allowed to commit, and are actually REQUIRED to commit your progress after every significant change. Commits should only happen when tests and linting are green.
 
 ## Structure
 
 ```
+README.md         # description of the app, keyboard shortcuts
+TODO.md           # initial ideas that contain possible future work, must be planned before implementing
 packages/core/    # Framework-agnostic TS library — NO React, NO browser APIs
 packages/web/     # React web app — rendering, input handling, persistence
 ```
 
 ## Commands
 
-```bash
-bun install          # Install dependencies
-bun run test         # Vitest unit tests
-bun run lint         # ESLint
-bunx tsc -b          # Type-check (builds core declarations, checks web)
-bun run dev          # Vite dev server
-bun run build        # Production build
-```
-
-A `justfile` is provided for convenience (`just check` runs tests + lint + typecheck).
+A `justfile` should be used for common commands (`just check` runs tests + lint + typecheck, `just test-file <name>` runs a single test file, `just install` runs `bun install`).
 
 - Use `bunx` instead of `npx` for running package binaries (this is a Bun project).
 - Save Playwright MCP screenshots to `/tmp`, not the project directory.
@@ -37,7 +29,7 @@ A `justfile` is provided for convenience (`just check` runs tests + lint + typec
 - **Editor is the sole source of truth.** All mutations go through Editor methods. DOM renders from Editor state, never writes to it.
 - **Core has zero browser dependencies.** Nothing in `packages/core/` imports React, DOM APIs, or browser globals. Text measurement uses a `TextMeasurer` interface (DI); web provides a DOM-based implementation, tests provide a stub.
 - **Diff-based undo.** Store captures diffs automatically. No Command classes.
-- **Positions are stored.** Layout engine computes initial positions; users can reposition nodes by dragging. File format includes x/y coordinates.
+- **Positions are stored.** Layout engine computes initial positions; users can reposition nodes. File format includes x/y coordinates.
 - **Images use sidecar storage.** `file.mindmap` + `file.assets/` directory. Never base64 in JSON.
 - **TestEditor for logic tests.** Playwright is only for visual regression and browser-API integration. If it can be tested without a browser, it must be.
 - **Text editing uses positioned textarea.** Not SVG foreignObject (cross-browser issues). Textarea is absolutely positioned over the canvas with zoom-aware transforms.
