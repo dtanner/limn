@@ -160,20 +160,38 @@ const bindings: KeyBinding[] = [
   },
   {
     key: "ArrowUp",
-    modifiers: { meta: true },
+    modifiers: { alt: true },
     mode: "nav",
     action: (editor) => {
       const sel = editor.getSelectedId();
-      if (sel) editor.reorderNode(sel, "up");
+      if (sel) editor.moveNode(sel, "up");
     },
   },
   {
     key: "ArrowDown",
-    modifiers: { meta: true },
+    modifiers: { alt: true },
     mode: "nav",
     action: (editor) => {
       const sel = editor.getSelectedId();
-      if (sel) editor.reorderNode(sel, "down");
+      if (sel) editor.moveNode(sel, "down");
+    },
+  },
+  {
+    key: "ArrowLeft",
+    modifiers: { alt: true },
+    mode: "nav",
+    action: (editor) => {
+      const sel = editor.getSelectedId();
+      if (sel) editor.moveNode(sel, "left");
+    },
+  },
+  {
+    key: "ArrowRight",
+    modifiers: { alt: true },
+    mode: "nav",
+    action: (editor) => {
+      const sel = editor.getSelectedId();
+      if (sel) editor.moveNode(sel, "right");
     },
   },
   // EasyMotion trigger
@@ -251,20 +269,38 @@ const bindings: KeyBinding[] = [
   },
   {
     key: "k",
-    modifiers: { meta: true },
+    modifiers: { alt: true },
     mode: "nav",
     action: (editor) => {
       const sel = editor.getSelectedId();
-      if (sel) editor.reorderNode(sel, "up");
+      if (sel) editor.moveNode(sel, "up");
     },
   },
   {
     key: "j",
-    modifiers: { meta: true },
+    modifiers: { alt: true },
     mode: "nav",
     action: (editor) => {
       const sel = editor.getSelectedId();
-      if (sel) editor.reorderNode(sel, "down");
+      if (sel) editor.moveNode(sel, "down");
+    },
+  },
+  {
+    key: "h",
+    modifiers: { alt: true },
+    mode: "nav",
+    action: (editor) => {
+      const sel = editor.getSelectedId();
+      if (sel) editor.moveNode(sel, "left");
+    },
+  },
+  {
+    key: "l",
+    modifiers: { alt: true },
+    mode: "nav",
+    action: (editor) => {
+      const sel = editor.getSelectedId();
+      if (sel) editor.moveNode(sel, "right");
     },
   },
 

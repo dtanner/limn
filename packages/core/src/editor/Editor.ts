@@ -590,6 +590,115 @@ export class Editor {
     this.notify();
   }
 
+  /** Structural move: reorder, overflow to parent's sibling, outdent, or indent. */
+  moveNode(nodeId: string, direction: "up" | "down" | "left" | "right"): void {
+    const node = this.store.getNode(nodeId);
+    if (node.parentId === null) return; // No-op on root nodes
+
+    if (direction === "up" || direction === "down") {
+      this.moveNodeVertical(nodeId, direction);
+    } else {
+      this.moveNodeHorizontal(nodeId, direction);
+    }
+  }
+
+  private moveNodeVertical(nodeId: string, direction: "up" | "down"): void {
+    const node = this.store.getNode(nodeId);
+    if (node.parentId === null) return;
+
+    const parent = this.store.getNode(node.parentId);
+    const idx = parent.children.indexOf(nodeId);
+
+    const atBoundary = direction === "up" ? idx === 0 : idx === parent.children.length - 1;
+
+    if (!atBoundary) {
+      // Simple reorder within siblings
+      this.reorderNode(nodeId, direction);
+      return;
+    }
+
+    // Overflow: move to parent's adjacent sibling
+    const grandparentId = parent.parentId;
+    if (grandparentId === null) return; // Parent is root, no overflow target
+
+    const grandparent = this.store.getNode(grandparentId);
+    const parentIdx = grandparent.children.indexOf(parent.id);
+
+    const targetIdx = direction === "up" ? parentIdx - 1 : parentIdx + 1;
+    const targetParentId = grandparent.children[targetIdx];
+    if (targetParentId === undefined) return; // No adjacent sibling
+
+    this.pushUndo("move-node");
+    const insertIndex = direction === "up"
+      ? this.store.getNode(targetParentId).children.length // Last child
+      : 0; // First child
+    this.store.moveNode(nodeId, targetParentId, insertIndex);
+    positionNewChild(this.store, nodeId);
+    reflowSubtree(this.store, nodeId);
+    relayoutFromNode(this.store, nodeId);
+    // Re-layout old parent too
+    relayoutFromNode(this.store, parent.id);
+    this.notify();
+  }
+
+  private moveNodeHorizontal(nodeId: string, direction: "left" | "right"): void {
+    const node = this.store.getNode(nodeId);
+    if (node.parentId === null) return;
+
+    const dir = branchDirection(this.store, nodeId);
+    // On right-side branch: left = outdent, right = indent
+    // On left-side branch: right = outdent, left = indent
+    const isOutdent = (dir === 1 && direction === "left") || (dir === -1 && direction === "right");
+
+    if (isOutdent) {
+      this.outdentNode(nodeId);
+    } else {
+      this.indentNode(nodeId);
+    }
+  }
+
+  private outdentNode(nodeId: string): void {
+    const node = this.store.getNode(nodeId);
+    if (node.parentId === null) return;
+
+    const parent = this.store.getNode(node.parentId);
+    const grandparentId = parent.parentId;
+    if (grandparentId === null) return; // Can't outdent direct children of root
+
+    const grandparent = this.store.getNode(grandparentId);
+    const parentIdx = grandparent.children.indexOf(parent.id);
+
+    this.pushUndo("move-node");
+    this.store.moveNode(nodeId, grandparentId, parentIdx + 1);
+    positionNewChild(this.store, nodeId);
+    reflowSubtree(this.store, nodeId);
+    relayoutFromNode(this.store, nodeId);
+    // Re-layout old parent too
+    relayoutFromNode(this.store, parent.id);
+    this.notify();
+  }
+
+  private indentNode(nodeId: string): void {
+    const node = this.store.getNode(nodeId);
+    if (node.parentId === null) return;
+
+    const parent = this.store.getNode(node.parentId);
+    const idx = parent.children.indexOf(nodeId);
+    if (idx <= 0) return; // No previous sibling to indent into
+
+    const prevSiblingId = parent.children[idx - 1];
+    if (prevSiblingId === undefined) return;
+
+    this.pushUndo("move-node");
+    this.store.moveNode(nodeId, prevSiblingId);
+    positionNewChild(this.store, nodeId);
+    reflowSubtree(this.store, nodeId);
+    relayoutFromNode(this.store, nodeId);
+    // Re-layout old parent too
+    relayoutFromNode(this.store, parent.id);
+    this.notify();
+  }
+
   setNodePosition(nodeId: string, x: number, y: number): void {
     this.pushUndo("set-position");
     this.store.setNodePosition(nodeId, x, y);
