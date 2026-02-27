@@ -349,6 +349,11 @@ export class Editor {
 
   addChild(parentId: string, text = ""): string {
     this.pushUndo("add-child");
+    const parent = this.store.getNode(parentId);
+    if (parent.collapsed) {
+      this.store.toggleCollapse(parentId);
+      relayoutFromNode(this.store, parentId);
+    }
     const id = this.store.addChild(parentId, text);
     this.remeasureNode(id);
     positionNewChild(this.store, id);

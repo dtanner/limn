@@ -431,6 +431,24 @@ describe("Editor", () => {
       editor.toggleCollapse("n1");
       editor.expectExpanded("n1");
     });
+
+    test("Tab on collapsed node expands parent and creates visible child", () => {
+      editor.select("n1");
+      editor.toggleCollapse("n1");
+      editor.expectCollapsed("n1");
+
+      // Tab creates a child -- parent should auto-expand
+      editor.pressKey("Tab");
+
+      editor.expectExpanded("n1");
+      const childId = editor.getSelectedId()!;
+      expect(childId).not.toBe("n1");
+      editor.expectEditing(childId);
+
+      // New child should be in visible nodes (not hidden by collapsed parent)
+      const visible = editor.getVisibleNodes();
+      expect(visible.some((n) => n.id === childId)).toBe(true);
+    });
   });
 
   describe("zoom", () => {
