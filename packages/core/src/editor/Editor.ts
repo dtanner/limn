@@ -572,7 +572,11 @@ export class Editor {
     this.pushUndo("toggle-collapse");
     this.store.toggleCollapse(nodeId);
     relayoutFromNode(this.store, nodeId);
-    this.resolveOverlapForNode(nodeId);
+    // Only resolve cross-tree overlap when expanding (tree grows).
+    // Collapsing shrinks the tree, so pushing other trees away is unwanted.
+    if (!this.store.getNode(nodeId).collapsed) {
+      this.resolveOverlapForNode(nodeId);
+    }
     this.notify();
   }
 

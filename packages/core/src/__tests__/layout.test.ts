@@ -241,6 +241,105 @@ describe("Layout engine", () => {
     });
   });
 
+  describe("collapse does not push other trees", () => {
+    test("collapsing a node does not shift an unrelated root tree", () => {
+      editor = new TestEditor();
+      const map: MindMapFileFormat = {
+        version: 1,
+        meta: { id: "test", theme: "default" },
+        camera: { x: 0, y: 0, zoom: 1 },
+        roots: [
+          {
+            id: "r1",
+            text: "Root 1",
+            x: 200,
+            y: 0,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [
+              {
+                id: "c1",
+                text: "Child 1",
+                x: 450,
+                y: -52,
+                width: 100,
+                height: NODE_HEIGHT,
+                children: [
+                  {
+                    id: "gc1",
+                    text: "Grand 1",
+                    x: 700,
+                    y: -78,
+                    width: 100,
+                    height: NODE_HEIGHT,
+                    children: [],
+                  },
+                  {
+                    id: "gc2",
+                    text: "Grand 2",
+                    x: 700,
+                    y: -26,
+                    width: 100,
+                    height: NODE_HEIGHT,
+                    children: [],
+                  },
+                ],
+              },
+              {
+                id: "c2",
+                text: "Child 2",
+                x: 450,
+                y: 0,
+                width: 100,
+                height: NODE_HEIGHT,
+                children: [],
+              },
+              {
+                id: "c3",
+                text: "Child 3",
+                x: 450,
+                y: 52,
+                width: 100,
+                height: NODE_HEIGHT,
+                children: [],
+              },
+            ],
+          },
+          {
+            id: "r2",
+            text: "Root 2",
+            x: 0,
+            y: -20,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [
+              {
+                id: "r2c1",
+                text: "R2 Child",
+                x: 250,
+                y: -20,
+                width: 100,
+                height: NODE_HEIGHT,
+                children: [],
+              },
+            ],
+          },
+        ],
+        assets: [],
+      };
+      editor.loadJSON(map);
+
+      const r2yBefore = editor.getNode("r2").y;
+      const r2c1yBefore = editor.getNode("r2c1").y;
+
+      // Collapse c1 on r1 -- should NOT move r2's tree
+      editor.toggleCollapse("c1");
+
+      expect(editor.getNode("r2").y).toBe(r2yBefore);
+      expect(editor.getNode("r2c1").y).toBe(r2c1yBefore);
+    });
+  });
+
   describe("cross-tree overlap", () => {
     test("two root trees do not overlap after layout", () => {
       editor = new TestEditor();
