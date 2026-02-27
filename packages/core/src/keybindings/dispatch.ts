@@ -176,6 +176,89 @@ const bindings: KeyBinding[] = [
       if (sel) editor.reorderNode(sel, "down");
     },
   },
+  // Vim-style hjkl navigation (mirrors arrow keys)
+  {
+    key: "h",
+    mode: "nav",
+    action: (editor) => {
+      editor.navigateLeft();
+    },
+  },
+  {
+    key: "j",
+    mode: "nav",
+    action: (editor) => {
+      editor.navigateDown();
+    },
+  },
+  {
+    key: "k",
+    mode: "nav",
+    action: (editor) => {
+      editor.navigateUp();
+    },
+  },
+  {
+    key: "l",
+    mode: "nav",
+    action: (editor) => {
+      editor.navigateRight();
+    },
+  },
+  {
+    key: "h",
+    modifiers: { shift: true },
+    mode: "nav",
+    action: (editor) => {
+      const vp = editor.getViewportSize();
+      editor.panCamera((vp.width || 800) * 0.1, 0);
+    },
+  },
+  {
+    key: "j",
+    modifiers: { shift: true },
+    mode: "nav",
+    action: (editor) => {
+      const vp = editor.getViewportSize();
+      editor.panCamera(0, -(vp.height || 600) * 0.1);
+    },
+  },
+  {
+    key: "k",
+    modifiers: { shift: true },
+    mode: "nav",
+    action: (editor) => {
+      const vp = editor.getViewportSize();
+      editor.panCamera(0, (vp.height || 600) * 0.1);
+    },
+  },
+  {
+    key: "l",
+    modifiers: { shift: true },
+    mode: "nav",
+    action: (editor) => {
+      const vp = editor.getViewportSize();
+      editor.panCamera(-(vp.width || 800) * 0.1, 0);
+    },
+  },
+  {
+    key: "k",
+    modifiers: { meta: true },
+    mode: "nav",
+    action: (editor) => {
+      const sel = editor.getSelectedId();
+      if (sel) editor.reorderNode(sel, "up");
+    },
+  },
+  {
+    key: "j",
+    modifiers: { meta: true },
+    mode: "nav",
+    action: (editor) => {
+      const sel = editor.getSelectedId();
+      if (sel) editor.reorderNode(sel, "down");
+    },
+  },
 
   // --- Edit mode ---
   {
@@ -305,9 +388,12 @@ export function dispatch(
   modifiers: Modifiers = {},
 ): boolean {
   const mode = editor.isEditing() ? "edit" : "nav";
+  // Normalize single-character keys to lowercase so bindings stay consistent
+  // (browser sends uppercase when Shift is held, e.g., "H" for Shift+h)
+  const normalizedKey = key.length === 1 ? key.toLowerCase() : key;
 
   for (const binding of bindings) {
-    if (binding.key !== key) continue;
+    if (binding.key !== normalizedKey) continue;
     if (binding.mode !== mode && binding.mode !== "both") continue;
     if (!modifiersMatch(binding.modifiers, modifiers)) continue;
 

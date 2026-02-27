@@ -642,6 +642,68 @@ describe("Editor", () => {
     });
   });
 
+  describe("vim-style hjkl navigation", () => {
+    test("h navigates left (same as ArrowLeft)", () => {
+      editor.select("n1");
+      editor.pressKey("h");
+      expect(editor.getSelectedId()).toBe("n0");
+    });
+
+    test("l navigates right (same as ArrowRight)", () => {
+      editor.select("n1");
+      editor.pressKey("l");
+      expect(editor.getSelectedId()).toBe("n3");
+    });
+
+    test("j navigates down (same as ArrowDown)", () => {
+      editor.select("n1");
+      editor.pressKey("j");
+      expect(editor.getSelectedId()).toBe("n2");
+    });
+
+    test("k navigates up (same as ArrowUp)", () => {
+      editor.select("n2");
+      editor.pressKey("k");
+      expect(editor.getSelectedId()).toBe("n1");
+    });
+
+    test("Shift+l pans canvas right", () => {
+      editor.setCamera(0, 0, 1);
+      editor.pressKey("l", { shift: true });
+      expect(editor.getCamera().x).toBeLessThan(0);
+    });
+
+    test("Shift+h pans canvas left", () => {
+      editor.setCamera(0, 0, 1);
+      editor.pressKey("h", { shift: true });
+      expect(editor.getCamera().x).toBeGreaterThan(0);
+    });
+
+    test("Shift+j pans canvas down", () => {
+      editor.setCamera(0, 0, 1);
+      editor.pressKey("j", { shift: true });
+      expect(editor.getCamera().y).toBeLessThan(0);
+    });
+
+    test("Shift+k pans canvas up", () => {
+      editor.setCamera(0, 0, 1);
+      editor.pressKey("k", { shift: true });
+      expect(editor.getCamera().y).toBeGreaterThan(0);
+    });
+
+    test("Cmd+j reorders node down", () => {
+      editor.select("n1");
+      editor.pressKey("j", { meta: true });
+      editor.expectChildren("n0", ["n2", "n1"]);
+    });
+
+    test("Cmd+k reorders node up", () => {
+      editor.select("n2");
+      editor.pressKey("k", { meta: true });
+      editor.expectChildren("n0", ["n2", "n1"]);
+    });
+  });
+
   describe("toJSON", () => {
     test("preserves camera position", () => {
       editor.setCamera(100, 200, 1.5);
