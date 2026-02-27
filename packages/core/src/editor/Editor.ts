@@ -17,6 +17,10 @@ import {
 
 export const ROOT_FONT_SIZE = 16;
 
+/** Weight applied to cross-axis distance in spatial fallback navigation.
+ *  Higher values strongly prefer nodes aligned on the primary axis. */
+const CROSS_AXIS_WEIGHT = 10;
+
 /** Snapshot of document state for undo/redo. */
 interface HistoryEntry {
   label: string;
@@ -476,6 +480,7 @@ export class Editor {
       }
     }
 
+    if (!best) best = this.spatialFallback("up");
     if (best) {
       this.selectedId = best.id;
       this.notify();
@@ -501,6 +506,7 @@ export class Editor {
       }
     }
 
+    if (!best) best = this.spatialFallback("down");
     if (best) {
       this.selectedId = best.id;
       this.notify();
@@ -521,6 +527,53 @@ export class Editor {
     return best;
   }
 
+  /** Spatial fallback: find the nearest visible node in the given direction
+   *  using a weighted distance score (primaryAxisDist + crossAxisDist * CROSS_AXIS_WEIGHT). */
+  private spatialFallback(direction: "up" | "down" | "left" | "right"): MindMapNode | null {
+    if (this.selectedId === null) return null;
+    const current = this.store.getNode(this.selectedId);
+    const cx = current.x + current.width / 2;
+    const cy = current.y + current.height / 2;
+
+    let best: MindMapNode | null = null;
+    let bestScore = Infinity;
+
+    for (const node of this.store.getVisibleNodes()) {
+      if (node.id === this.selectedId) continue;
+      const nx = node.x + node.width / 2;
+      const ny = node.y + node.height / 2;
+
+      let inDirection: boolean;
+      let score: number;
+
+      switch (direction) {
+        case "up":
+          inDirection = ny < cy;
+          score = (cy - ny) + Math.abs(nx - cx) * CROSS_AXIS_WEIGHT;
+          break;
+        case "down":
+          inDirection = ny > cy;
+          score = (ny - cy) + Math.abs(nx - cx) * CROSS_AXIS_WEIGHT;
+          break;
+        case "left":
+          inDirection = nx < cx;
+          score = (cx - nx) + Math.abs(ny - cy) * CROSS_AXIS_WEIGHT;
+          break;
+        case "right":
+          inDirection = nx > cx;
+          score = (nx - cx) + Math.abs(ny - cy) * CROSS_AXIS_WEIGHT;
+          break;
+      }
+
+      if (inDirection && score < bestScore) {
+        best = node;
+        bestScore = score;
+      }
+    }
+
+    return best;
+  }
+
   navigateLeft(): void {
     if (this.selectedId === null) { this.selectNearestToViewportCenter(); return; }
     const current = this.store.getNode(this.selectedId);
@@ -536,6 +589,13 @@ export class Editor {
         }
         this.selectedId = target.id;
         this.notify();
+      } else {
+        // No left children: spatial fallback
+        const fallback = this.spatialFallback("left");
+        if (fallback) {
+          this.selectedId = fallback.id;
+          this.notify();
+        }
       }
       return;
     }
@@ -556,6 +616,13 @@ export class Editor {
         }
         this.selectedId = target.id;
         this.notify();
+      } else {
+        // Left-side leaf: spatial fallback
+        const fallback = this.spatialFallback("left");
+        if (fallback) {
+          this.selectedId = fallback.id;
+          this.notify();
+        }
       }
     }
   }
@@ -575,6 +642,13 @@ export class Editor {
         }
         this.selectedId = target.id;
         this.notify();
+      } else {
+        // No right children: spatial fallback
+        const fallback = this.spatialFallback("right");
+        if (fallback) {
+          this.selectedId = fallback.id;
+          this.notify();
+        }
       }
       return;
     }
@@ -591,6 +665,13 @@ export class Editor {
         }
         this.selectedId = target.id;
         this.notify();
+      } else {
+        // Right-side leaf: spatial fallback
+        const fallback = this.spatialFallback("right");
+        if (fallback) {
+          this.selectedId = fallback.id;
+          this.notify();
+        }
       }
     } else {
       // Left-side branch: Right goes toward parent

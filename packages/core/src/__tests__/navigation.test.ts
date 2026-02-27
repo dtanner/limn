@@ -272,10 +272,12 @@ describe("Navigation", () => {
       expect(editor.getSelectedId()).toBe("store");
     });
 
-    test("navigateDown on only root is no-op (no sibling roots)", () => {
+    test("navigateDown on only root with children falls back spatially to nearest child below", () => {
       editor.select("root");
       editor.navigateDown();
-      expect(editor.getSelectedId()).toBe("root");
+      // root center y=16, c1 center=-36, c2 center=16, c3 center=68
+      // No sibling roots, so spatial fallback kicks in. c3 is the only child strictly below root center.
+      expect(editor.getSelectedId()).toBe("c3");
     });
   });
 
@@ -389,6 +391,266 @@ describe("Navigation", () => {
       // Should expand and select nearest child by y (c2 is at same y-center as root)
       expect(editor.isCollapsed("root")).toBe(false);
       expect(editor.getSelectedId()).toBe("c2");
+    });
+  });
+
+  describe("spatial fallback navigation", () => {
+    /** Root with an only-child, plus a disconnected root below */
+    function onlyChildWithDisconnectedRoot(): MindMapFileFormat {
+      return {
+        version: 1,
+        meta: { id: "test", theme: "default" },
+        camera: { x: 0, y: 0, zoom: 1 },
+        roots: [
+          {
+            id: "root1",
+            text: "Root 1",
+            x: 0,
+            y: 0,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [
+              {
+                id: "only",
+                text: "Only Child",
+                x: 250,
+                y: 0,
+                width: 100,
+                height: NODE_HEIGHT,
+                children: [],
+              },
+            ],
+          },
+          {
+            id: "root2",
+            text: "Root 2",
+            x: 250,
+            y: 200,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [],
+          },
+        ],
+        assets: [],
+      };
+    }
+
+    test("up from only-child falls back to nearest node above", () => {
+      const editor = new TestEditor();
+      editor.loadJSON(onlyChildWithDisconnectedRoot());
+      editor.select("only");
+      // "only" center=(300, 16), no siblings above.
+      // Spatial fallback: root1 center=(50, 16) is NOT above (same y).
+      // root2 center=(300, 216) is below. So up is no-op here.
+      // Let's add a node above. Use a different fixture:
+      const file: MindMapFileFormat = {
+        version: 1,
+        meta: { id: "test", theme: "default" },
+        camera: { x: 0, y: 0, zoom: 1 },
+        roots: [
+          {
+            id: "root1",
+            text: "Root 1",
+            x: 0,
+            y: 0,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [
+              {
+                id: "only",
+                text: "Only Child",
+                x: 250,
+                y: 100,
+                width: 100,
+                height: NODE_HEIGHT,
+                children: [],
+              },
+            ],
+          },
+          {
+            id: "root2",
+            text: "Root 2",
+            x: 250,
+            y: -100,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [],
+          },
+        ],
+        assets: [],
+      };
+      editor.loadJSON(file);
+      editor.select("only");
+      editor.navigateUp();
+      // "only" center=(300, 116). root2 center=(300, -84) is above.
+      // root1 center=(50, 16) is also above but far in x.
+      // root2 score: yDist=200 + xDist=0*10 = 200
+      // root1 score: yDist=100 + xDist=250*10 = 2600
+      expect(editor.getSelectedId()).toBe("root2");
+    });
+
+    test("down from only-child falls back to nearest node below", () => {
+      const editor = new TestEditor();
+      editor.loadJSON(onlyChildWithDisconnectedRoot());
+      editor.select("only");
+      editor.navigateDown();
+      // "only" center=(300, 16). No siblings. Spatial fallback:
+      // root2 center=(300, 216) is below. score: yDist=200 + xDist=0*10 = 200
+      // root1 center=(50, 16) is NOT below (same y center).
+      expect(editor.getSelectedId()).toBe("root2");
+    });
+
+    test("fallback strongly prefers same-column nodes", () => {
+      // "current" is an only-child so sibling search finds nothing -> spatial fallback.
+      // Two disconnected roots above: one at same X (far in Y), one close in Y but far in X.
+      const file: MindMapFileFormat = {
+        version: 1,
+        meta: { id: "test", theme: "default" },
+        camera: { x: 0, y: 0, zoom: 1 },
+        roots: [
+          {
+            id: "parent",
+            text: "Parent",
+            x: 0,
+            y: 300,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [
+              {
+                id: "current",
+                text: "Current",
+                x: 200,
+                y: 300,
+                width: 100,
+                height: NODE_HEIGHT,
+                children: [],
+              },
+            ],
+          },
+          {
+            id: "sameCol",
+            text: "Same Column",
+            x: 200,
+            y: 0,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [],
+          },
+          {
+            id: "closeY",
+            text: "Close Y",
+            x: 600,
+            y: 250,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [],
+          },
+        ],
+        assets: [],
+      };
+      const editor = new TestEditor();
+      editor.loadJSON(file);
+      editor.select("current");
+      editor.navigateUp();
+      // current center=(250, 316). Only child, no siblings -> spatial fallback.
+      // sameCol center=(250, 16): yDist=300, xDist=0 -> score=300
+      // closeY center=(650, 266): yDist=50, xDist=400 -> score=50+4000=4050
+      // parent center=(50, 316): NOT above (same y center) -> filtered out
+      expect(editor.getSelectedId()).toBe("sameCol");
+    });
+
+    test("right from leaf falls back to node to the right", () => {
+      const file: MindMapFileFormat = {
+        version: 1,
+        meta: { id: "test", theme: "default" },
+        camera: { x: 0, y: 0, zoom: 1 },
+        roots: [
+          {
+            id: "root1",
+            text: "Root 1",
+            x: 0,
+            y: 0,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [
+              {
+                id: "leaf",
+                text: "Leaf",
+                x: 250,
+                y: 0,
+                width: 100,
+                height: NODE_HEIGHT,
+                children: [],
+              },
+            ],
+          },
+          {
+            id: "root2",
+            text: "Root 2",
+            x: 600,
+            y: 0,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [],
+          },
+        ],
+        assets: [],
+      };
+      const editor = new TestEditor();
+      editor.loadJSON(file);
+      editor.select("leaf");
+      editor.navigateRight();
+      // leaf center=(300, 16). No children. Spatial fallback:
+      // root2 center=(650, 16) is to the right. score: xDist=350 + yDist=0*10 = 350
+      // root1 center=(50, 16) is NOT to the right.
+      expect(editor.getSelectedId()).toBe("root2");
+    });
+
+    test("left from root with no left children falls back", () => {
+      const file: MindMapFileFormat = {
+        version: 1,
+        meta: { id: "test", theme: "default" },
+        camera: { x: 0, y: 0, zoom: 1 },
+        roots: [
+          {
+            id: "root1",
+            text: "Root 1",
+            x: 300,
+            y: 0,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [
+              {
+                id: "child",
+                text: "Child",
+                x: 550,
+                y: 0,
+                width: 100,
+                height: NODE_HEIGHT,
+                children: [],
+              },
+            ],
+          },
+          {
+            id: "root2",
+            text: "Root 2",
+            x: 0,
+            y: 0,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [],
+          },
+        ],
+        assets: [],
+      };
+      const editor = new TestEditor();
+      editor.loadJSON(file);
+      editor.select("root1");
+      editor.navigateLeft();
+      // root1 center=(350, 16). No left children (child is at x=550, to the right).
+      // Spatial fallback: root2 center=(50, 16) is to the left.
+      // score: xDist=300 + yDist=0*10 = 300
+      expect(editor.getSelectedId()).toBe("root2");
     });
   });
 
