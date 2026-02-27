@@ -81,6 +81,7 @@ export function TextEditor({ editor, node, camera }: TextEditorProps) {
   return (
     <textarea
       ref={textareaRef}
+      rows={1}
       data-mindforge-edit="true"
       value={node.text}
       onChange={handleChange}
