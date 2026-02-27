@@ -4,7 +4,7 @@
 
 **Phase**: All chunks complete (1-17), plus post-spec polish and EasyMotion navigation
 **Last updated**: 2026-02-26
-**Tests**: 317 passing across 16 test files, lint and typecheck clean
+**Tests**: 299 passing across 14 test files, lint and typecheck clean
 
 ---
 
@@ -419,6 +419,12 @@
 - Non-matching labels dim when a prefix character is buffered
 - 24 tests added (label generation, lifecycle, key handling, dispatch integration)
 
+**Cross-tree overlap fixes (2026-02-26):**
+- Collapsing a node no longer pushes unrelated trees (only expansion triggers overlap resolution)
+- Overlap detection uses shared x-range instead of full bounding boxes: `treeBoundingBox()` accepts optional x-clip parameters, and `resolveTreeOverlap()` computes y-extents only within the x-region where both trees coexist. This prevents a deep tree's wide leaf level from pushing away a small tree near the narrow root.
+- Trees at different x-ranges are never pushed apart
+- 3 layout tests added
+
 ---
 
 ## Remaining gaps (not blocking, could be future work)
@@ -455,3 +461,4 @@
 | 2026-02-26 | 4px drag threshold before starting drag | Distinguishes click-to-select from drag-to-reposition; prevents accidental drags |
 | 2026-02-26 | 100px reparent proximity threshold | Generous enough to be discoverable; uses distance from dragged node center to target edge center |
 | 2026-02-26 | EasyMotion over search/filter for quick jump | Constant-time visual selection; no typing node text; scales to large maps with double-char labels |
+| 2026-02-26 | Shared x-range overlap detection | Full bounding box overestimates triangular trees; comparing y-extents only in the shared x-range prevents false overlap pushes |
