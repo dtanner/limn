@@ -189,22 +189,31 @@ export function relayoutAfterDelete(
 
 /**
  * Compute the bounding box of a root tree (all visible descendants).
+ * Optionally constrained to nodes whose x-range intersects [clipMinX, clipMaxX].
  */
 export function treeBoundingBox(
   store: MindMapStore,
   rootId: string,
+  clipMinX?: number,
+  clipMaxX?: number,
 ): { minX: number; minY: number; maxX: number; maxY: number } {
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
   let maxY = -Infinity;
+  const clipping = clipMinX !== undefined && clipMaxX !== undefined;
 
   function visit(nodeId: string): void {
     const node = store.getNode(nodeId);
-    minX = Math.min(minX, node.x);
-    minY = Math.min(minY, node.y);
-    maxX = Math.max(maxX, node.x + node.width);
-    maxY = Math.max(maxY, node.y + node.height);
+    const nodeRight = node.x + node.width;
+
+    // If clipping, skip nodes outside the x range
+    if (!clipping || (nodeRight > clipMinX && node.x < clipMaxX)) {
+      minX = Math.min(minX, node.x);
+      minY = Math.min(minY, node.y);
+      maxX = Math.max(maxX, nodeRight);
+      maxY = Math.max(maxY, node.y + node.height);
+    }
 
     if (!node.collapsed) {
       for (const childId of node.children) {
@@ -245,6 +254,10 @@ const TREE_PADDING = 40;
  * Check and resolve overlap between root trees.
  * After modifying a tree (changedRootId), check if any other tree
  * overlaps and push it away.
+ *
+ * Uses the shared x-range between trees for y-overlap detection,
+ * so a deep tree's wide leaf level doesn't push away a small tree
+ * that only overlaps near the narrow root.
  */
 export function resolveTreeOverlap(
   store: MindMapStore,
@@ -260,26 +273,36 @@ export function resolveTreeOverlap(
 
     const otherBox = treeBoundingBox(store, otherRoot.id);
 
-    // Check overlap
-    const overlapX =
-      changedBox.maxX > otherBox.minX && changedBox.minX < otherBox.maxX;
-    const overlapY =
-      changedBox.maxY > otherBox.minY && changedBox.minY < otherBox.maxY;
+    // Check if the trees overlap in x at all
+    const sharedMinX = Math.max(changedBox.minX, otherBox.minX);
+    const sharedMaxX = Math.min(changedBox.maxX, otherBox.maxX);
+    if (sharedMinX >= sharedMaxX) continue; // No x overlap
 
-    if (overlapX && overlapY) {
+    // Recompute y-extents using only nodes within the shared x range
+    const changedClipped = treeBoundingBox(store, changedRootId, sharedMinX, sharedMaxX);
+    const otherClipped = treeBoundingBox(store, otherRoot.id, sharedMinX, sharedMaxX);
+
+    // If either tree has no nodes in the shared range, no overlap
+    if (changedClipped.minY === Infinity || otherClipped.minY === Infinity) continue;
+
+    // Check y overlap within the shared x range
+    const overlapY =
+      changedClipped.maxY > otherClipped.minY && changedClipped.minY < otherClipped.maxY;
+
+    if (overlapY) {
       // Push other tree away vertically
-      const changedCenterY = (changedBox.minY + changedBox.maxY) / 2;
-      const otherCenterY = (otherBox.minY + otherBox.maxY) / 2;
+      const changedCenterY = (changedClipped.minY + changedClipped.maxY) / 2;
+      const otherCenterY = (otherClipped.minY + otherClipped.maxY) / 2;
 
       if (otherCenterY >= changedCenterY) {
         // Other tree is below: push down
         const pushAmount =
-          changedBox.maxY - otherBox.minY + TREE_PADDING;
+          changedClipped.maxY - otherClipped.minY + TREE_PADDING;
         shiftSubtree(store, otherRoot.id, pushAmount);
       } else {
         // Other tree is above: push up
         const pushAmount =
-          otherBox.maxY - changedBox.minY + TREE_PADDING;
+          otherClipped.maxY - changedClipped.minY + TREE_PADDING;
         shiftSubtree(store, otherRoot.id, -pushAmount);
       }
     }

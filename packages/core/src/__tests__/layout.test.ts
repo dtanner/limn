@@ -341,8 +341,72 @@ describe("Layout engine", () => {
   });
 
   describe("cross-tree overlap", () => {
-    test("two root trees do not overlap after layout", () => {
+    test("overlap detection uses shared x-range, not full bounding box", () => {
+      // A deep tree is narrow at the root but wide at the leaves.
+      // A small tree positioned near the root (far from the leaves)
+      // should NOT be pushed away by the leaf-level bounding box.
       editor = new TestEditor();
+      const map: MindMapFileFormat = {
+        version: 1,
+        meta: { id: "test", theme: "default" },
+        camera: { x: 0, y: 0, zoom: 1 },
+        roots: [
+          {
+            id: "deep",
+            text: "Deep Root",
+            x: 200,
+            y: 0,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [
+              {
+                id: "d1",
+                text: "D1",
+                x: 450,
+                y: 0,
+                width: 100,
+                height: NODE_HEIGHT,
+                children: [
+                  // Leaves spread far vertically at depth 2
+                  { id: "leaf1", text: "L1", x: 700, y: -200, width: 100, height: NODE_HEIGHT, children: [] },
+                  { id: "leaf2", text: "L2", x: 700, y: -100, width: 100, height: NODE_HEIGHT, children: [] },
+                  { id: "leaf3", text: "L3", x: 700, y: 100, width: 100, height: NODE_HEIGHT, children: [] },
+                  { id: "leaf4", text: "L4", x: 700, y: 200, width: 100, height: NODE_HEIGHT, children: [] },
+                ],
+              },
+            ],
+          },
+          {
+            // Small tree positioned above the deep root, within x-range of root
+            // but NOT overlapping with any actual nodes
+            id: "small",
+            text: "Small",
+            x: 200,
+            y: -100,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [],
+          },
+        ],
+        assets: [],
+      };
+      editor.loadJSON(map);
+
+      const smallYBefore = editor.getNode("small").y;
+
+      // Expanding the deep tree should NOT push "small" away,
+      // because at the x-range where both trees coexist (x=200-300),
+      // the deep tree only has its root at y=0, far from small at y=-100.
+      editor.toggleCollapse("d1");  // collapse
+      editor.toggleCollapse("d1");  // expand (triggers overlap check)
+
+      expect(editor.getNode("small").y).toBe(smallYBefore);
+    });
+
+    test("trees with overlapping nodes in shared x-range get pushed apart", () => {
+      editor = new TestEditor();
+      // Two roots at the same x, close together vertically.
+      // Both have children at the same x, creating real overlap.
       const map: MindMapFileFormat = {
         version: 1,
         meta: { id: "test", theme: "default" },
@@ -361,7 +425,7 @@ describe("Layout engine", () => {
             id: "r2",
             text: "Root 2",
             x: 0,
-            y: 100,
+            y: 50,
             width: 100,
             height: NODE_HEIGHT,
             children: [],
@@ -371,16 +435,56 @@ describe("Layout engine", () => {
       };
       editor.loadJSON(map);
 
-      // Add many children to r1 that would push into r2's space
+      // r1 root at y=[0,32], r2 root at y=[50,82].
+      // Adding a child to r1 re-centers and may push r1 into r2's space.
+      // Both roots share x-range [0,100], so overlap is real.
+      editor.addChild("r1", "C1");
+
+      const r1 = editor.getNode("r1");
+      const r2 = editor.getNode("r2");
+      // r2 should not overlap with r1 in y
+      expect(r2.y).toBeGreaterThanOrEqual(r1.y + r1.height);
+    });
+
+    test("trees at different x-ranges are not pushed apart", () => {
+      editor = new TestEditor();
+      const map: MindMapFileFormat = {
+        version: 1,
+        meta: { id: "test", theme: "default" },
+        camera: { x: 0, y: 0, zoom: 1 },
+        roots: [
+          {
+            id: "r1",
+            text: "Root 1",
+            x: 0,
+            y: 0,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [],
+          },
+          {
+            // r2 is far to the right, no x overlap
+            id: "r2",
+            text: "Root 2",
+            x: 500,
+            y: 0,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [],
+          },
+        ],
+        assets: [],
+      };
+      editor.loadJSON(map);
+
+      const r2yBefore = editor.getNode("r2").y;
+
+      // Adding children to r1 (they go at x=250) doesn't share x with r2 (x=500)
       for (let i = 0; i < 5; i++) {
         editor.addChild("r1", `C${i}`);
       }
 
-      // r2 should have been pushed down to avoid overlap
-      const r1Children = editor.getChildren("r1");
-      const lowestR1Child = Math.max(...r1Children.map((c) => c.y + c.height));
-      const r2y = editor.getNode("r2").y;
-      expect(r2y).toBeGreaterThanOrEqual(lowestR1Child);
+      expect(editor.getNode("r2").y).toBe(r2yBefore);
     });
   });
 });
