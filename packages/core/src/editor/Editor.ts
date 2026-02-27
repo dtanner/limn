@@ -116,6 +116,13 @@ export class Editor {
   private imageAspectRatio = 1;
   private imageResizeChanged = false;
 
+  // EasyMotion state
+  private easyMotionActive = false;
+  private easyMotionByLabel = new Map<string, string>();  // label -> nodeId
+  private easyMotionByNode = new Map<string, string>();   // nodeId -> label
+  private easyMotionBuffer = "";
+  private easyMotionPrefixes = new Set<string>();
+
   // Viewport dimensions (set by web layer for zoom-to-fit)
   private viewportWidth = 0;
   private viewportHeight = 0;
@@ -345,6 +352,115 @@ export class Editor {
     this.selectedId = null;
     this.editing = false;
     this.notify();
+  }
+
+  // --- EasyMotion ---
+
+  isEasyMotionActive(): boolean {
+    return this.easyMotionActive;
+  }
+
+  getEasyMotionLabel(nodeId: string): string | undefined {
+    return this.easyMotionByNode.get(nodeId);
+  }
+
+  getEasyMotionBuffer(): string {
+    return this.easyMotionBuffer;
+  }
+
+  enterEasyMotionMode(): void {
+    const visible = this.store.getVisibleNodes();
+    const selectedId = this.selectedId;
+
+    // Filter out the selected node
+    const candidates = selectedId
+      ? visible.filter((n) => n.id !== selectedId)
+      : visible;
+
+    if (candidates.length === 0) return;
+
+    // Sort by distance from reference point
+    let refX: number;
+    let refY: number;
+    if (selectedId) {
+      const sel = this.store.getNode(selectedId);
+      refX = sel.x + sel.width / 2;
+      refY = sel.y + sel.height / 2;
+    } else {
+      // Use viewport center in world coordinates
+      refX = (this.viewportWidth / 2 - this.camera.x) / this.camera.zoom;
+      refY = (this.viewportHeight / 2 - this.camera.y) / this.camera.zoom;
+    }
+
+    candidates.sort((a, b) => {
+      const da = Math.hypot(a.x + a.width / 2 - refX, a.y + a.height / 2 - refY);
+      const db = Math.hypot(b.x + b.width / 2 - refX, b.y + b.height / 2 - refY);
+      return da - db;
+    });
+
+    const nodeIds = candidates.map((n) => n.id);
+    const labelToNode = generateEasyMotionLabels(nodeIds);
+
+    this.easyMotionByLabel = labelToNode;
+    this.easyMotionByNode = new Map<string, string>();
+    for (const [label, id] of labelToNode) {
+      this.easyMotionByNode.set(id, label);
+    }
+
+    // Collect single-char prefixes (letters that start double-char labels)
+    this.easyMotionPrefixes = new Set<string>();
+    for (const label of labelToNode.keys()) {
+      if (label.length === 2) {
+        this.easyMotionPrefixes.add(label.charAt(0));
+      }
+    }
+
+    this.easyMotionBuffer = "";
+    this.easyMotionActive = true;
+    this.notify();
+  }
+
+  exitEasyMotionMode(): void {
+    this.easyMotionActive = false;
+    this.easyMotionByLabel = new Map();
+    this.easyMotionByNode = new Map();
+    this.easyMotionPrefixes = new Set();
+    this.easyMotionBuffer = "";
+    this.notify();
+  }
+
+  handleEasyMotionKey(key: string): void {
+    if (!this.easyMotionActive) return;
+
+    if (this.easyMotionBuffer === "") {
+      // First character
+      const nodeId = this.easyMotionByLabel.get(key);
+      if (nodeId) {
+        // Single-char label match: select and exit
+        this.select(nodeId);
+        this.exitEasyMotionMode();
+        return;
+      }
+      if (this.easyMotionPrefixes.has(key)) {
+        // Valid prefix: buffer it and wait for second char
+        this.easyMotionBuffer = key;
+        this.notify();
+        return;
+      }
+      // Invalid key: cancel
+      this.exitEasyMotionMode();
+    } else {
+      // Second character after prefix
+      const fullLabel = this.easyMotionBuffer + key;
+      const nodeId = this.easyMotionByLabel.get(fullLabel);
+      if (nodeId) {
+        this.select(nodeId);
+        this.exitEasyMotionMode();
+        return;
+      }
+      // Invalid combo: cancel
+      this.exitEasyMotionMode();
+    }
   }
 
   // --- Edit mode ---

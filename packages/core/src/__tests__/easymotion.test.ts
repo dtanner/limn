@@ -1,5 +1,7 @@
-import { describe, test, expect } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
 import { generateEasyMotionLabels } from "../editor/Editor";
+import { TestEditor } from "../test-editor/TestEditor";
+import type { MindMapFileFormat } from "../serialization/schema";
 
 describe("generateEasyMotionLabels", () => {
   test("N=0 nodes returns empty map", () => {
@@ -92,5 +94,117 @@ describe("generateEasyMotionLabels", () => {
       expect(new Set(labels).size).toBe(labels.length);
       expect(result.size).toBe(n);
     }
+  });
+});
+
+const NODE_HEIGHT = 32;
+
+/** Fixture: root with three children at known positions. */
+function threeNodeMap(): MindMapFileFormat {
+  return {
+    version: 1,
+    meta: { id: "test", theme: "default" },
+    camera: { x: 0, y: 0, zoom: 1 },
+    roots: [
+      {
+        id: "root",
+        text: "Root",
+        x: 0,
+        y: 0,
+        width: 100,
+        height: NODE_HEIGHT,
+        children: [
+          {
+            id: "c1",
+            text: "Child 1",
+            x: 250,
+            y: -52,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [],
+          },
+          {
+            id: "c2",
+            text: "Child 2",
+            x: 250,
+            y: 0,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [],
+          },
+          {
+            id: "c3",
+            text: "Child 3",
+            x: 250,
+            y: 52,
+            width: 100,
+            height: NODE_HEIGHT,
+            children: [],
+          },
+        ],
+      },
+    ],
+    assets: [],
+  };
+}
+
+describe("EasyMotion mode lifecycle", () => {
+  let editor: TestEditor;
+
+  beforeEach(() => {
+    editor = new TestEditor();
+    editor.loadJSON(threeNodeMap());
+  });
+
+  test("enterEasyMotionMode sets isEasyMotionActive to true", () => {
+    editor.select("root");
+    expect(editor.isEasyMotionActive()).toBe(false);
+    editor.enterEasyMotionMode();
+    expect(editor.isEasyMotionActive()).toBe(true);
+  });
+
+  test("enterEasyMotionMode generates labels for visible nodes except selected", () => {
+    editor.select("root");
+    editor.enterEasyMotionMode();
+    // 4 visible nodes, root is selected -> 3 labels
+    expect(editor.getEasyMotionLabel("c1")).toBeDefined();
+    expect(editor.getEasyMotionLabel("c2")).toBeDefined();
+    expect(editor.getEasyMotionLabel("c3")).toBeDefined();
+    expect(editor.getEasyMotionLabel("root")).toBeUndefined();
+  });
+
+  test("exitEasyMotionMode clears active state and labels", () => {
+    editor.select("root");
+    editor.enterEasyMotionMode();
+    editor.exitEasyMotionMode();
+    expect(editor.isEasyMotionActive()).toBe(false);
+    expect(editor.getEasyMotionLabel("c1")).toBeUndefined();
+  });
+
+  test("labels are sorted by distance from selected node", () => {
+    // Select c2 (at x=250, y=0). Distances:
+    // root center=(50,16): dist ~= 201
+    // c1 center=(300,-36): dist ~= 61
+    // c3 center=(300,68): dist ~= 69
+    // Expected order: c1 (closest), c3, root (farthest)
+    editor.select("c2");
+    editor.enterEasyMotionMode();
+    expect(editor.getEasyMotionLabel("c1")).toBe("a"); // closest
+    expect(editor.getEasyMotionLabel("c3")).toBe("b"); // next
+    expect(editor.getEasyMotionLabel("root")).toBe("c"); // farthest
+  });
+
+  test("entering with nothing selected uses viewport center for sort", () => {
+    editor.setViewportSize(800, 600);
+    editor.setCamera(400, 300, 1);
+    editor.deselect();
+    editor.enterEasyMotionMode();
+    // All 4 nodes should have labels (nothing selected to exclude)
+    expect(editor.isEasyMotionActive()).toBe(true);
+    let labelCount = 0;
+    for (const node of editor.getVisibleNodes()) {
+      if (editor.getEasyMotionLabel(node.id) !== undefined) labelCount++;
+    }
+    expect(labelCount).toBe(4);
   });
 });
